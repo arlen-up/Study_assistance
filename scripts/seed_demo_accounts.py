@@ -3,13 +3,16 @@
 계정마다 학년·수강 과목·이수 학점·과제(제출 여부)·관심 직무·학습 기록이 달라서,
 챗봇에 "졸업까지 몇 학점 남았어?", "남은 과제 알려줘"를 물으면 계정마다 다른 답이 나와요.
 
-| 계정 | 학년 (입학) | 이번 학기(2026-2) | 남은 과제 | 관심 직무 |
-|---|---|---|---|---|
-| lms-demo1@example.com | 1학년 (2026) | 자료구조·컴퓨터공학활용 등 | 4개 (24시간 안 1개) | 프론트엔드 |
-| lms-demo2@example.com | 2학년 (2025) | 실제 e-class 시간표 6과목 | 4개 (24시간 안 3개, 가장 바쁨) | AI·데이터 |
-| lms-demo3@example.com | 2학년 (2025) | DB·네트워크·백엔드·자바 등 | 4개 (급한 것 없음) | 백엔드 |
-| lms-demo4@example.com | 3학년 (2024) | 웹 해킹·네트워크 보안 등 | 5개 (24시간 안 1개) | 보안 |
-| lms-demo5@example.com | 4학년 (2023) | 캡스톤·재수강 (졸업 직전) | 3개 (마감 지난 것 1개) | AI·데이터 |
+| 계정 | 학년 (입학) | 펫 단계 (연속 학습) | 이번 학기(2026-2) | 남은 과제 | 관심 직무 |
+|---|---|---|---|---|---|
+| lms-demo1@example.com | 1학년 (2026) | 🥚 알 — 기록 없음, 첫 퀴즈로 부화 | 자료구조·컴퓨터공학활용 등 | 4개 (24시간 안 1개) | 프론트엔드 |
+| lms-demo2@example.com | 2학년 (2025) | 🐛 애벌레 — 2일 (오늘 하면 번데기) | 실제 e-class 시간표 6과목 | 4개 (24시간 안 3개) | AI·데이터 |
+| lms-demo3@example.com | 2학년 (2025) | 🥚 알 — 끊김 (시무룩) | DB·네트워크·백엔드·자바 등 | 4개 (급한 것 없음) | 백엔드 |
+| lms-demo4@example.com | 3학년 (2024) | 🌰 번데기 — 6일 (오늘 하면 나비) | 웹 해킹·네트워크 보안 등 | 5개 (24시간 안 1개) | 보안 |
+| lms-demo5@example.com | 4학년 (2023) | 🦋 나비 — 21일 (최종 단계) | 캡스톤·재수강 (졸업 직전) | 3개 (마감 지난 것 1개) | AI·데이터 |
+
+펫 단계는 연속 학습일로 정해져요 (🥚 0일 → 🐛 1일 → 🌰 3일 → 🦋 7일, backend/services/pet_service.py).
+오늘 칸은 모두 비워 둬서, 시연 중 퀴즈 1개를 풀면 1·2·4번 계정은 바로 다음 단계로 진화해요.
 
 하는 일 (앱 서버 없이 Supabase REST + 서버용 비밀 키만 사용)
   1. Supabase 로그인 계정 만들기(이메일 인증 완료) — 이미 있으면 비밀번호만 새로 정함
@@ -71,6 +74,11 @@ class StudyPattern:
     weekday_chance: float
     weekend_chance: float
     seed: int
+    fresh: bool = False   # True = 학습 기록이 하나도 없는 새 계정 (펫이 알에서 아직 안 깨어남)
+
+    @property
+    def expected_streak(self) -> int:
+        return 0 if self.fresh or self.run_end > 1 else self.run_len
 
 
 @dataclass(frozen=True)
@@ -140,17 +148,18 @@ class Profile:
 PROFILES: list[Profile] = [
     Profile(
         no=1, name="김새봄", admission_year=2026, target_job="frontend", pet_name="콩이",
-        note="1학년 — 첫 학기를 마치고 전공 기초를 듣는 중",
+        note="1학년 — 🥚 알: 아직 공부 기록이 없어요. 퀴즈 1개를 풀면 🐛 애벌레로 깨어나요",
         submitted=(("SW111", "엑셀 함수로 성적표 만들기"), ("GE103", "나의 진로 로드맵 작성")),
         history=[
             *done("2026-1", "GE101:A0", "GE102:B+", "GE105:B0", "CS101:A+", "CS102:B+", "CS211:A0"),
             *taking("CS103", "CS104", "CS201", "SW111", "GE103", "GE104"),
         ],
-        pattern=StudyPattern(run_len=3, run_end=1, history_days=60, weekday_chance=0.35, weekend_chance=0.1, seed=1),
+        pattern=StudyPattern(run_len=0, run_end=1, history_days=0, weekday_chance=0, weekend_chance=0, seed=1,
+                             fresh=True),
     ),
     Profile(
         no=2, name="이하늘", admission_year=2025, target_job="ai_data", pet_name="하루",
-        note="2학년 — 실제 e-class 2026-2 시간표 6과목, 운영체제 재수강 필요",
+        note="2학년 — 🐛 애벌레(2일 연속): 오늘 공부하면 🌰 번데기로 진화. 실제 e-class 시간표 6과목",
         submitted=(("CS204", "TCP 3-way handshake 정리"), ("SW111", "엑셀 함수로 성적표 만들기"),
                    ("GE301", "[AI] 김영란법 : 부정청탁방지법"), ("GE301", "[AI] 관인 청인 직인 특수관인 차이")),
         history=[
@@ -159,11 +168,11 @@ PROFILES: list[Profile] = [
             *done("2026-1", "GE201:A0", "CS205:B+", "CS206:B0", "CS221:B+", "CS331:A0"),
             *taking("CS202", "CS204", "SW111", "SW221", "SW231", "GE301"),
         ],
-        pattern=StudyPattern(run_len=12, run_end=1, history_days=95, weekday_chance=0.55, weekend_chance=0.2, seed=2),
+        pattern=StudyPattern(run_len=2, run_end=1, history_days=95, weekday_chance=0.55, weekend_chance=0.2, seed=2),
     ),
     Profile(
         no=3, name="박도윤", admission_year=2025, target_job="backend", pet_name="모모",
-        note="2학년 — 백엔드 준비, 최근 이틀 공부를 쉬어 연속 기록이 끊김",
+        note="2학년 — 🥚 알(끊김): 이틀 쉬어 연속 기록이 끊겨 알로 돌아갔어요 (펫이 시무룩). 백엔드 준비",
         submitted=(("CS202", "수강신청 시스템 ERD 설계"), ("CS204", "10주차.정리제출"), ("SW231", "상속과 인터페이스 실습")),
         history=[
             *done("2025-1", "GE101:B0", "GE102:B0", "GE105:C+", "CS101:B+", "CS102:B0", "CS211:B0"),
@@ -175,7 +184,7 @@ PROFILES: list[Profile] = [
     ),
     Profile(
         no=4, name="최민서", admission_year=2024, target_job="security", pet_name="별이",
-        note="3학년 — 보안 트랙, 운영체제는 재수강으로 이수",
+        note="3학년 — 🌰 번데기(6일 연속): 오늘 공부하면 🦋 나비로 진화. 보안 트랙",
         submitted=(("SW221", "pandas로 CSV 데이터 정리"),),
         history=[
             *done("2024-1", "GE101:A0", "GE102:A0", "GE105:B+", "CS101:A0", "CS102:A+", "CS211:B+"),
@@ -185,11 +194,11 @@ PROFILES: list[Profile] = [
             *done("2026-1", "GE202:B0", "CS311:B+", "CS321:B0", "CS322:B+", "CS335:A0"),
             *taking("CS301", "CS332", "CS333", "CS334", "SW221", "GE203"),
         ],
-        pattern=StudyPattern(run_len=5, run_end=1, history_days=120, weekday_chance=0.6, weekend_chance=0.3, seed=4),
+        pattern=StudyPattern(run_len=6, run_end=1, history_days=120, weekday_chance=0.6, weekend_chance=0.3, seed=4),
     ),
     Profile(
         no=5, name="정우진", admission_year=2023, target_job="ai_data", pet_name="뭉치",
-        note="4학년 — 졸업 직전, 캡스톤 + 시스템 프로그래밍 재수강만 남음",
+        note="4학년 — 🦋 나비(21일 연속, 최종 단계). 졸업 직전, 캡스톤 + 시스템 프로그래밍 재수강만 남음",
         submitted=(("GE301", "[AI] 김영란법 : 부정청탁방지법"), ("GE301", "[AI] 관인 청인 직인 특수관인 차이"),
                    ("CS324", "프롬프트 엔지니어링 실험 보고서")),
         history=[
@@ -340,6 +349,11 @@ def document_pools(sb: httpx.Client, course_names: dict[str, str]) -> dict[str, 
 
 
 def seed_logs(sb: httpx.Client, user_id: str, p: Profile, pools: dict[str, list[str]], today: dt.date) -> int:
+    check(sb.delete("/rest/v1/study_logs", params={"user_id": f"eq.{user_id}"}), "학습 기록 지우기")
+    if p.pattern.fresh:  # 새 계정: 기록 없음 → 잔디 비어 있고 펫은 알
+        check(sb.patch("/rest/v1/users", params={"id": f"eq.{user_id}"}, json={"last_studied_at": None}),
+              "최근 학습 시각 지우기")
+        return 0
     taking_codes = [c for c, sem, status, _ in p.history if status == "in_progress"]
     done_codes = [c for c, _, status, _ in p.history if status != "in_progress"]
     def docs_of(codes: list[str]) -> list[str]:
@@ -381,20 +395,46 @@ def seed_logs(sb: httpx.Client, user_id: str, p: Profile, pools: dict[str, list[
             logs.append((rng.choice(active_days), doc_id))
     # 망각 곡선: 1회 학습 후 하루 지남 → 오늘 복습 / 2회 학습 후 3일 지남 → 오늘 복습 / 3회 → 7일 뒤 예정
     # (오늘 복습 2개는 자정 직후 기록으로 넣어서 오늘 하루 종일 '오늘 복습할 교안'에 보이게)
+    # 복습 기록이 '연속을 끊는 날(gap_day)'에 들어가면 연속 기록이 길어지므로, 그날부터는 하루씩 뒤로 민다
     e = pat.run_end
-    due_logs = [(e, due_1d), (e + 6, due_3d), (e + 2, due_3d)]
-    logs += [(e + 8, upcoming), (e + 4, upcoming), (e + 1, upcoming)]
+    def keep_gap(days_ago: int) -> int:
+        return days_ago + 1 if days_ago >= gap_day else days_ago
+    due_logs = [(keep_gap(e), due_1d), (keep_gap(e + 6), due_3d), (keep_gap(e + 2), due_3d)]
+    logs += [(keep_gap(e + 8), upcoming), (keep_gap(e + 4), upcoming), (keep_gap(e + 1), upcoming)]
 
     rows = [
         {"user_id": user_id, "document_id": doc_id, "score": rng.choice([1, 2, 3, 3]), "total_questions": 3,
          "completed": True, "duration_seconds": rng.randint(90, 240), "studied_at": at(days_ago, early)}
         for (days_ago, doc_id), early in [*((log, False) for log in logs), *((log, True) for log in due_logs)]
     ]
-    check(sb.delete("/rest/v1/study_logs", params={"user_id": f"eq.{user_id}"}), "학습 기록 지우기")
     check(sb.post("/rest/v1/study_logs", json=rows, headers={"Prefer": "return=minimal"}), "학습 기록 넣기")
     last = max(r["studied_at"] for r in rows)
     check(sb.patch("/rest/v1/users", params={"id": f"eq.{user_id}"}, json={"last_studied_at": last}), "최근 학습 시각 저장")
     return len(rows)
+
+
+PET_STAGES = [(7, "🦋 나비"), (3, "🌰 번데기"), (1, "🐛 애벌레"), (0, "🥚 알")]  # pet_service.py 와 같은 기준
+
+
+def actual_streak(sb: httpx.Client, user_id: str) -> tuple[int, int]:
+    """앱과 같은 DB 함수로 (현재 연속 학습일, 공부한 날 수)를 계산한다. 오늘 안 했어도 어제까지 이어지면 유지."""
+    days = check(sb.post("/rest/v1/rpc/get_study_heatmap", json={"p_user_id": user_id, "p_days": 365}),
+                 "잔디 조회").json()
+    done_flags = [bool(d["is_completed"]) for d in days]
+    tail = done_flags if done_flags and done_flags[-1] else done_flags[:-1]
+    current = 0
+    for flag in reversed(tail):
+        if not flag:
+            break
+        current += 1
+    return current, sum(done_flags)
+
+
+def pet_stage(streak: int, active_days: int) -> str:
+    label = next(label for need, label in PET_STAGES if streak >= need)
+    if active_days == 0:
+        return f"{label} (새 계정)"
+    return f"{label} (끊김)" if streak == 0 else label
 
 
 # ---------------------------------------------------------------------
@@ -455,20 +495,24 @@ def main() -> None:
                 "lms_synced_at": dt.datetime.now(dt.UTC).isoformat(),
             }), "도우미 사용자 정보 저장")
             count = seed_logs(sb, user_id, p, pools, today)
+            streak, active_days = actual_streak(sb, user_id)
+            if streak != p.pattern.expected_streak:
+                sys.exit(f"❌ {p.email}: 연속 학습일이 {streak}일이에요 (기대값 {p.pattern.expected_streak}일)")
             in_progress = [code for code, _, status, _ in p.history if status == "in_progress"]
             no_docs = [names[c] for c in in_progress if c not in pools]
             todo = open_assignments(sb, student_id)
-            summary.append((p, completed, sum(credits[c] for c in in_progress), in_progress, count, no_docs, todo))
-            print(f"  이수 {completed}학점 · 수강 중 {len(in_progress)}과목 · 제출 {len(p.submitted)}개"
+            stage = pet_stage(streak, active_days)
+            summary.append((p, completed, sum(credits[c] for c in in_progress), in_progress, count, no_docs, todo,
+                            streak, stage))
+            print(f"  펫 {stage} · 연속 {streak}일 · 이수 {completed}학점 · 수강 중 {len(in_progress)}과목"
                   f" · 남은 과제 {len(todo)}개 · 학습 기록 {count}개")
 
     hint = "직접 정한 값" if args.password else "무작위 — 다시 실행하면 바뀌어요"
     print(f"\n✅ 완료! 5개 계정 공통 비밀번호 ({hint}): {password}\n")
-    for p, completed, now_credits, codes, count, no_docs, todo in summary:
-        streak = p.pattern.run_len if p.pattern.run_end == 1 else 0
+    for p, completed, now_credits, codes, count, no_docs, todo, streak, stage in summary:
         print(f"- {p.email}  {p.name} · {p.grade_year}학년({p.admission_year} 입학) · 관심 직무 {p.target_job}")
         print(f"    이수 {completed}학점 / 졸업 {total_required}학점 (남은 {max(total_required - completed, 0)}학점)"
-              f" · 이번 학기 {now_credits}학점 · 연속 학습 {streak}일 · 학습 기록 {count}개")
+              f" · 이번 학기 {now_credits}학점 · 펫 {stage} · 연속 학습 {streak}일 · 학습 기록 {count}개")
         print(f"    수강 중: {', '.join(names[c] for c in codes)}")
         for a in todo:
             due = dt.datetime.fromisoformat(a["due_at"]).astimezone(KST).strftime("%m/%d %H:%M")
