@@ -1,0 +1,55 @@
+{# 에빙하우스 망각 곡선 복습 알림 #}
+<section id="reviews" class="card"{% if oob %} hx-swap-oob="true"{% endif %}>
+  {% set r = dashboard.reviews %}
+  <h2 class="card-title">🔔 복습 알림</h2>
+  <p class="muted small">1일 → 3일 → 7일 간격으로 복습하면 오래 기억해요</p>
+
+  {% if not (r.due or r.upcoming or r.mastered) %}
+  <p class="muted small">아직 학습 기록이 없어요. 퀴즈를 풀면 복습 일정이 생겨요.</p>
+  {% endif %}
+
+  {% if r.due %}
+  <h3 class="list-title due">오늘 복습할 교안 <span class="badge warning">{{ r.due | length }}</span></h3>
+  <ul class="review-list">
+    {% for item in r.due %}
+    <li>
+      <div class="review-text">
+        <p class="review-title">{{ item.document_title }}</p>
+        <p class="muted xsmall">{{ item.review_count }}회 학습 · 마지막 {{ item.last_studied_at | kst }}</p>
+      </div>
+      <a class="btn primary sm" href="/?tab=quiz&amp;quiz_doc={{ item.document_id }}">퀴즈로 복습</a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if r.upcoming %}
+  <h3 class="list-title">⏰ 예정된 복습</h3>
+  <ul class="review-list">
+    {% for item in r.upcoming %}
+    <li>
+      <div class="review-text">
+        <p class="review-title">{{ item.document_title }}</p>
+        <p class="muted xsmall">{{ item.review_count }}회 학습 · 다음 복습 {{ item.next_review_at | relative_days }}</p>
+      </div>
+      <span class="badge outline">{{ item.stage_label }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if r.mastered %}
+  <h3 class="list-title done">✅ 복습 완료</h3>
+  <ul class="review-list">
+    {% for item in r.mastered %}
+    <li>
+      <div class="review-text">
+        <p class="review-title">{{ item.document_title }}</p>
+        <p class="muted xsmall">{{ item.review_count }}회 학습</p>
+      </div>
+      <span class="badge success">완료</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>

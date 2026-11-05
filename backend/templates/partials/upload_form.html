@@ -1,0 +1,22 @@
+<form id="upload-form" class="stack" hx-post="/ui/documents" hx-encoding="multipart/form-data"
+      hx-target="#upload-result" hx-indicator="#upload-loading" hx-disabled-elt="find button"{% if oob %} hx-swap-oob="true"{% endif %}>
+  <label class="field">
+    <span>교안 제목 *</span>
+    <input class="input" name="title" required maxlength="200" placeholder="예: 자료구조 3주차 - 스택과 큐">
+  </label>
+  <div class="grid-3">
+    <label class="field"><span>과목</span><input class="input" name="course_name" maxlength="100" placeholder="자료구조"></label>
+    <label class="field"><span>주차</span><input class="input" name="week_no" type="number" min="1" max="52" placeholder="3"></label>
+    <label class="field"><span>키워드 (쉼표 구분)</span><input class="input" name="keywords" maxlength="500" placeholder="스택, 큐, LIFO"></label>
+  </div>
+  <label class="field">
+    <span>파일 (4MB 이하)</span>
+    <input class="input" name="file" type="file" accept=".pdf,.md,.markdown,.txt,.html,.htm">
+  </label>
+  <label class="field">
+    <span>또는 텍스트 붙여넣기</span>
+    <textarea class="textarea" name="text" rows="6" maxlength="200000" placeholder="교안 내용을 붙여넣으세요"></textarea>
+  </label>
+  <button type="submit" class="btn primary">등록하기</button>
+  <p id="upload-loading" class="htmx-indicator muted small"><span class="spinner"></span> 교안을 나누고 임베딩하는 중…</p>
+</form>

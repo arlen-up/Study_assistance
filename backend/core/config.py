@@ -20,15 +20,16 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
-    # --- Supabase (서버 전용) ---
+    # --- Supabase ---
     supabase_url: str
-    supabase_secret_key: SecretStr
+    supabase_secret_key: SecretStr  # 서버 전용 (RLS 우회) — 절대 브라우저로 보내지 않음
+    supabase_publishable_key: SecretStr | None = None  # 로그인/토큰 갱신용 (없으면 secret 키 사용)
 
-    # --- Tilon (OpenAI 호환) ---
-    tilon_api_key: SecretStr
-    tilon_base_url: str
-    tilon_chat_model: str
-    tilon_embedding_model: str
+    # --- LLM (OpenAI 호환 API: OpenAI, Azure OpenAI 호환 게이트웨이, 로컬 vLLM 등) ---
+    llm_api_key: SecretStr
+    llm_base_url: str = "https://api.openai.com/v1"
+    llm_chat_model: str = "gpt-4o-mini"
+    llm_embedding_model: str = "text-embedding-3-small"  # 1536차원
 
     # --- 임베딩 ---
     embedding_dimensions: int = Field(default=1536, ge=1, le=4096)
@@ -45,7 +46,7 @@ class Settings(BaseSettings):
 
     app_timezone: str = "Asia/Seoul"
 
-    @field_validator("supabase_url", "tilon_base_url")
+    @field_validator("supabase_url", "llm_base_url")
     @classmethod
     def _validate_url(cls, value: str) -> str:
         value = value.strip().rstrip("/")
@@ -53,7 +54,7 @@ class Settings(BaseSettings):
             raise ValueError("URL은 http:// 또는 https:// 로 시작해야 합니다")
         return value
 
-    @field_validator("tilon_chat_model", "tilon_embedding_model")
+    @field_validator("llm_chat_model", "llm_embedding_model")
     @classmethod
     def _not_blank(cls, value: str) -> str:
         value = value.strip()
@@ -64,6 +65,11 @@ class Settings(BaseSettings):
     @property
     def allowed_hosts(self) -> frozenset[str]:
         return frozenset(h.strip().lower() for h in self.lms_allowed_hosts.split(",") if h.strip())
+
+    @property
+    def auth_key(self) -> str:
+        key = self.supabase_publishable_key or self.supabase_secret_key
+        return key.get_secret_value()
 
 
 @lru_cache(maxsize=1)

@@ -1,0 +1,44 @@
+{% import "partials/_macros.html" as m %}
+<div class="stack">
+  <div class="alert info score">
+    <p class="score-line">{{ result.score }} / {{ result.total }} 정답 {% if result.score == result.total %}🎉{% endif %}</p>
+    <p>오늘의 잔디를 심었어요 🌱</p>
+    {% if result.review and result.review.next_review_at %}
+    <p>다음 복습: <strong>{{ result.review.next_review_at | kst }}</strong> ({{ result.review.stage_label }})</p>
+    {% elif result.review %}
+    <p>이 교안은 복습을 모두 마쳤어요!</p>
+    {% endif %}
+  </div>
+
+  {% for r in result.results %}
+  {% set q = questions[r.index] %}
+  <div class="question result {{ 'correct' if r.correct else 'wrong' }}">
+    <div class="question-head">
+      <span class="badge outline">Q{{ r.index + 1 }}</span>
+      <span class="badge secondary">{{ m.type_labels[q.type] }}</span>
+      <span class="result-mark">{{ "⭕ 정답" if r.correct else "❌ 오답" }}</span>
+    </div>
+    <p class="q-text pre">{{ q.question }}</p>
+    {% if q.type == "code_blank" and q.code %}<pre class="code"><code>{{ q.code }}</code></pre>{% endif %}
+    {% if q.options %}
+    <div class="options{{ ' ox' if q.type == 'ox' }}">
+      {% for opt in q.options %}
+      <div class="option static{% if opt == r.correct_answer %} is-correct{% elif opt == r.your_answer %} is-wrong{% endif %}">{{ opt }}</div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="small">내 답: <code>{{ r.your_answer }}</code></p>
+    {% endif %}
+    <div class="explain">
+      {% if not r.correct %}<p>정답: <strong class="mono">{{ r.correct_answer }}</strong></p>{% endif %}
+      <p class="muted">{{ r.explanation }}</p>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{# out-of-band: 잔디·통계·복습 알림을 새로 고침 #}
+{% include "partials/due_banner.html" %}
+{% include "partials/stats.html" %}
+{% include "partials/heatmap.html" %}
+{% include "partials/reviews.html" %}

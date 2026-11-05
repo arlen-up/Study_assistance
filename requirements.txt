@@ -2,17 +2,18 @@
 # 2026-11-05 기준 PyPI 버전 고정, uv pip compile로 충돌 없음 확인
 # (langchain-mcp-adapters 0.3.2가 mcp<2.0.0을 요구하므로 mcp는 1.x 최신)
 
-# --- Web API ---
+# --- Web (API + 서버 렌더링 화면) ---
 fastapi==0.162.0
 uvicorn==0.54.0            # 로컬 개발 서버용 (Vercel에서는 사용 안 함)
 pydantic==2.14.2
 pydantic-settings==2.16.2
-python-multipart==0.0.33   # 교안 파일 업로드(multipart/form-data)
+python-multipart==0.0.33   # 폼·파일 업로드(multipart/form-data)
+jinja2==3.1.6              # HTML 템플릿
 
 # --- MCP (Model Context Protocol) ---
 mcp==1.30.0
 
-# --- LangChain / LLM (Tilon OpenAI 호환 API) ---
+# --- LangChain / LLM (OpenAI 호환 API) ---
 langchain-core==1.7.6
 langchain-openai==1.7.4
 langchain-mcp-adapters==0.3.2

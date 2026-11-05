@@ -1,16 +1,10 @@
-# Node / Next.js
-node_modules/
-.next/
-out/
-*.tsbuildinfo
-next-env.d.ts
-
 # Python
 __pycache__/
 *.py[cod]
 .venv/
 venv/
 .pytest_cache/
+.ruff_cache/
 
 # 환경변수·개인 연결 정보
 .env*

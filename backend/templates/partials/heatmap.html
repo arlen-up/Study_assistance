@@ -1,0 +1,28 @@
+{# GitHub식 학습 잔디: 열 = 주(일~토), 칸 색 = 그날 학습 횟수 #}
+<section id="heatmap" class="card"{% if oob %} hx-swap-oob="true"{% endif %}>
+  <h2 class="card-title">🌱 학습 잔디</h2>
+  <p class="muted small">최근 {{ dashboard.streak.total_days }}일 중 <strong>{{ dashboard.streak.active_days }}일</strong> 학습했어요</p>
+  <div class="heatmap-scroll">
+    <div class="heatmap">
+      <div class="heatmap-week heatmap-labels" aria-hidden="true">
+        <span class="heatmap-month"></span>
+        {% for d in ["", "월", "", "수", "", "금", ""] %}<span class="heatmap-daylabel">{{ d }}</span>{% endfor %}
+      </div>
+      {% for week in build_heatmap(dashboard.streak.days) %}
+      <div class="heatmap-week">
+        <span class="heatmap-month">{{ week.month_label }}</span>
+        {% for cell in week.cells %}
+          {% if cell %}
+          <span class="cell lv{{ cell.level }}" title="{{ cell.date }} · {{ (cell.count ~ '회 학습') if cell.count else '학습 없음' }}"></span>
+          {% else %}
+          <span class="cell empty-cell"></span>
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="heatmap-legend muted">
+    적음 {% for lv in range(5) %}<span class="cell lv{{ lv }}"></span>{% endfor %} 많음
+  </div>
+</section>

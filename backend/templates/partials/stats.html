@@ -1,0 +1,7 @@
+<div id="stats" class="stats"{% if oob %} hx-swap-oob="true"{% endif %}>
+  {% set s = dashboard.streak %}
+  <div class="card stat"><span class="stat-icon">🔥</span><div><p class="muted small">연속 학습</p><p class="stat-value">{{ s.current_streak }}<small>일</small></p></div></div>
+  <div class="card stat"><span class="stat-icon">🏆</span><div><p class="muted small">최장 연속</p><p class="stat-value">{{ s.longest_streak }}<small>일</small></p></div></div>
+  <div class="card stat"><span class="stat-icon">📅</span><div><p class="muted small">올해 학습한 날</p><p class="stat-value">{{ s.active_days }}<small>일</small></p></div></div>
+  <div class="card stat"><span class="stat-icon">🔔</span><div><p class="muted small">오늘 복습</p><p class="stat-value">{{ dashboard.reviews.due | length }}<small>개</small></p></div></div>
+</div>

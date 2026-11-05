@@ -1,0 +1,4 @@
+<div class="alert danger" role="alert">{{ message }}</div>
+{# 실패한 질문을 입력창에 되돌려 다시 보낼 수 있게 함 #}
+<textarea id="chat-input" name="message" class="textarea" rows="2" maxlength="2000" required
+          placeholder="궁금한 내용을 입력하세요" hx-swap-oob="true">{{ draft }}</textarea>

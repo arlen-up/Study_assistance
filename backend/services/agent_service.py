@@ -99,9 +99,9 @@ class AgentService:
         self._db = db
         self._embeddings = embeddings or EmbeddingService(settings)
         self._llm = ChatOpenAI(
-            model=settings.tilon_chat_model,
-            api_key=settings.tilon_api_key,
-            base_url=settings.tilon_base_url,
+            model=settings.llm_chat_model,
+            api_key=settings.llm_api_key,
+            base_url=settings.llm_base_url,
             temperature=settings.llm_temperature,
             timeout=settings.llm_timeout_seconds,
             max_retries=2,
@@ -109,7 +109,7 @@ class AgentService:
 
     @property
     def model_name(self) -> str:
-        return self._settings.tilon_chat_model
+        return self._settings.llm_chat_model
 
     def _new_deps(self) -> ToolDeps:
         return ToolDeps(settings=self._settings, db=self._db, embeddings=self._embeddings)

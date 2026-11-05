@@ -1,4 +1,4 @@
-"""Tilon(OpenAI 호환) 임베딩 서비스."""
+"""OpenAI 호환 임베딩 서비스."""
 
 import logging
 
@@ -15,9 +15,9 @@ class EmbeddingService:
     def __init__(self, settings: Settings) -> None:
         self._dimensions = settings.embedding_dimensions
         kwargs: dict[str, object] = {
-            "model": settings.tilon_embedding_model,
-            "api_key": settings.tilon_api_key,
-            "base_url": settings.tilon_base_url,
+            "model": settings.llm_embedding_model,
+            "api_key": settings.llm_api_key,
+            "base_url": settings.llm_base_url,
             # OpenAI 이외 서버는 토큰 ID 배열 입력을 지원하지 않는 경우가 많아 문자열 그대로 전송
             "check_embedding_ctx_length": False,
             "timeout": settings.llm_timeout_seconds,

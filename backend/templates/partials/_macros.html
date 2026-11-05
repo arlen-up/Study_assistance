@@ -1,0 +1,45 @@
+{# 여러 화면에서 재사용하는 조각 #}
+
+{% macro doc_label(d) -%}
+  {%- set prefix = [d.course_name, (d.week_no ~ '주차') if d.week_no else none] | select | join(' · ') -%}
+  {%- if prefix %}[{{ prefix }}] {% endif %}{{ d.title }}
+{%- endmacro %}
+
+{% macro doc_select(id, documents, selected, placeholder, oob=false) -%}
+<select id="{{ id }}" name="document_id" class="select" aria-label="교안 선택"{% if oob %} hx-swap-oob="true"{% endif %}>
+  <option value="">{{ placeholder }}</option>
+  {% for d in documents %}
+  <option value="{{ d.id }}"{% if d.id|string == selected %} selected{% endif %}>{{ doc_label(d) }}</option>
+  {% endfor %}
+</select>
+{%- endmacro %}
+
+{% macro sources(items) -%}
+{% if items %}
+<div class="sources">
+  <p class="sources-title">출처</p>
+  {% for s in items %}
+  <details class="source">
+    <summary>
+      <span class="source-title">📄 {{ s.document_title }}</span>
+      {% if s.page_number %}<span class="muted">p.{{ s.page_number }}</span>{% endif %}
+      <span class="muted source-sim">{{ (s.similarity * 100) | round | int }}%</span>
+    </summary>
+    <p class="source-body">{{ s.content }}</p>
+  </details>
+  {% endfor %}
+</div>
+{% endif %}
+{%- endmacro %}
+
+{% macro tool_badges(calls) -%}
+{% if calls %}
+<div class="tool-badges" aria-label="AI가 사용한 MCP 도구">
+  {% for c in calls %}
+  <span class="badge {{ 'secondary' if c.ok else 'danger' }}" title="{{ c.arguments | tojson }}">🔧 {{ c.name }}</span>
+  {% endfor %}
+</div>
+{% endif %}
+{%- endmacro %}
+
+{% set type_labels = {"multiple_choice": "객관식", "ox": "O/X", "code_blank": "코드 빈칸"} %}

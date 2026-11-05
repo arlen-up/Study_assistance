@@ -1,0 +1,25 @@
+{% import "partials/_macros.html" as m %}
+{% set confidence_labels = {"high": ("근거 충분", "success"), "medium": ("근거 일부", "warning"), "low": ("근거 부족", "danger")} %}
+{# 1) 대화 로그 끝에 추가될 질문/답변 말풍선 #}
+<div class="bubble-row user"><div class="bubble user">{{ question }}</div></div>
+<div class="bubble-row">
+  <div class="bubble bot">
+    <p class="pre">{{ result.answer }}</p>
+    {% if result.three_minute_summary %}
+    <div class="mini-summary">
+      <p class="mini-summary-title">⏱ 3분 요약</p>
+      <p class="pre">{{ result.three_minute_summary }}</p>
+    </div>
+    {% endif %}
+    {% set label = confidence_labels[result.confidence] %}
+    <span class="badge {{ label[1] }}">{{ label[0] }}</span>
+    {{ m.sources(result.sources) }}
+    {{ m.tool_badges(result.tool_calls) }}
+  </div>
+</div>
+
+{# 2) out-of-band: 대화 기록 갱신, 입력창 비우기, 안내 문구 제거 #}
+<input type="hidden" id="chat-history" name="history" value="{{ history_json }}" hx-swap-oob="true">
+<textarea id="chat-input" name="message" class="textarea" rows="2" maxlength="2000" required
+          placeholder="궁금한 내용을 입력하세요" hx-swap-oob="true"></textarea>
+<p id="chat-empty" hx-swap-oob="delete"></p>
