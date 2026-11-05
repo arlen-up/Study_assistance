@@ -1,28 +1,35 @@
 {% import "partials/_macros.html" as m %}
-{% set confidence_labels = {"high": ("근거 충분", "success"), "medium": ("근거 일부", "warning"), "low": ("근거 부족", "danger")} %}
 {# 1) 대화 로그 끝에 추가될 질문/답변 말풍선 #}
 <div class="bubble-row user"><div class="bubble user">{{ question }}</div></div>
-<div class="bubble-row">
-  <div class="bubble bot">
-    <p class="pre">{{ result.answer }}</p>
+<div class="bubble-row bot">
+  <article class="bubble bot" id="turn-{{ turn_id }}" aria-label="도우미 답변">
+    <div class="bubble-meta">
+      {{ m.route_badge(result.route) }}
+      {% if result.route and result.route.type == "study" %}{{ m.evidence_badge(result.evidence) }}{% endif %}
+      {% if result.answer_ms %}<span class="muted xsmall">{{ result.answer_ms | seconds }}</span>{% endif %}
+    </div>
+
+    <div class="md">{{ result.answer | markdown(result.citations | selectattr("cited") | map(attribute="ref") | list, "cite-" ~ turn_id) }}</div>
+
     {% if result.three_minute_summary %}
     <div class="mini-summary">
       <p class="mini-summary-title">⏱ 3분 요약</p>
-      <p class="pre">{{ result.three_minute_summary }}</p>
+      <div class="md">{{ result.three_minute_summary | markdown }}</div>
     </div>
     {% endif %}
-    {% set label = confidence_labels[result.confidence] %}
-    <div class="tags">
-      <span class="badge {{ label[1] }}">{{ label[0] }}</span>
-      {% for name in result.lms_data %}<span class="badge outline">🏫 LMS {{ name }}</span>{% endfor %}
-    </div>
-    {{ m.sources(result.sources) }}
-    {{ m.tool_badges(result.tool_calls) }}
-  </div>
+
+    {% if not result.route or result.route.type == "study" %}
+      {{ m.citations(result.citations, turn_id, "📭 교안에서 이 질문의 근거를 찾지 못했어요. 교안을 등록하거나 질문을 바꿔 보세요.") }}
+    {% elif result.route.type == "info" %}
+      {{ m.lms_sources(result.lms_sources) }}
+    {% else %}
+      <div class="sources"><p class="source-note">💬 일상 대화라 교안·학교 시스템을 찾지 않고 답했어요.</p></div>
+    {% endif %}
+
+    {{ m.tool_calls(result.tool_calls) }}
+    {{ m.followups(result.context_document_id, result.context_document_title) }}
+  </article>
 </div>
 
-{# 2) out-of-band: 대화 기록 갱신, 입력창 비우기, 안내 문구 제거 #}
+{# 2) out-of-band: 대화 기록 갱신 (입력창은 보낼 때 app.js가 비운다) #}
 <input type="hidden" id="chat-history" name="history" value="{{ history_json }}" hx-swap-oob="true">
-<textarea id="chat-input" name="message" class="textarea" rows="2" maxlength="2000" required
-          placeholder="궁금한 내용을 입력하세요" hx-swap-oob="true"></textarea>
-<p id="chat-empty" hx-swap-oob="delete"></p>

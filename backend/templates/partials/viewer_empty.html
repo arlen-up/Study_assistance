@@ -1,0 +1,18 @@
+{% import "partials/_macros.html" as m %}
+{# 📄 교안 뷰어 — 아직 아무것도 열지 않았을 때 #}
+<div class="viewer viewer-empty">
+  <p class="viewer-kicker">📄 교안 뷰어</p>
+  <h2 class="viewer-title">출처를 누르면 여기에 교안이 열려요</h2>
+  <p class="muted small">답변 밑 <strong>📎 출처</strong>의 ‘교안 보기’를 누르면, PDF는 그 쪽으로 바로 가고 글 교안은 답변에 쓴 부분을 노란색으로 표시해요.</p>
+  {% if documents %}
+  <h3 class="list-title">최근 교안</h3>
+  <ul class="viewer-docs">
+    {% for d in documents[:8] %}
+    <li>
+      <button type="button" class="viewer-doc" hx-get="/ui/viewer/{{ d.id }}" hx-target="#doc-viewer" hx-swap="innerHTML"
+              data-open-viewer>{{ m.doc_label(d) }}</button>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>

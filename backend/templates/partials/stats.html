@@ -1,7 +1,138 @@
-<div id="stats" class="stats"{% if oob %} hx-swap-oob="true"{% endif %}>
-  {% set s = dashboard.streak %}
-  <div class="card stat"><span class="stat-icon">🔥</span><div><p class="muted small">연속 학습</p><p class="stat-value">{{ s.current_streak }}<small>일</small></p></div></div>
-  <div class="card stat"><span class="stat-icon">🏆</span><div><p class="muted small">최장 연속</p><p class="stat-value">{{ s.longest_streak }}<small>일</small></p></div></div>
-  <div class="card stat"><span class="stat-icon">📅</span><div><p class="muted small">올해 학습한 날</p><p class="stat-value">{{ s.active_days }}<small>일</small></p></div></div>
-  <div class="card stat"><span class="stat-icon">🔔</span><div><p class="muted small">오늘 복습</p><p class="stat-value">{{ dashboard.reviews.due | length }}<small>개</small></p></div></div>
-</div>
+{# 📊 학습 대시보드: 숫자 4개 → 그래프. 좌표는 backend/services/insights_service.py 가 계산하고 여기서는 그리기만 한다.
+   그래프 위에 마우스를 올리거나(키보드 Tab) 누르면 값이 보인다 (data-tip → /static/js/app.js) #}
+{% set ins = insights %}
+<section id="stats" class="insights"{% if oob %} hx-swap-oob="true"{% endif %} aria-label="학습 대시보드">
+{% if ins %}
+  {# ---------- 1) 핵심 숫자 ---------- #}
+  <div class="kpis">
+    <div class="card kpi">
+      <p class="kpi-label">🔥 연속 학습</p>
+      <p class="kpi-value">{{ ins.current_streak }}<small>일</small></p>
+      <div class="meter" role="img" aria-label="최장 기록 {{ ins.streak_goal }}일 중 {{ ins.current_streak }}일">
+        <span style="width: {{ ins.streak_pct }}%"></span>
+      </div>
+      <p class="kpi-note">최장 {{ ins.longest_streak }}일{% if ins.current_streak >= ins.longest_streak and ins.current_streak > 0 %} · 지금이 최고 기록! 🎉{% endif %}</p>
+    </div>
+    <div class="card kpi">
+      <p class="kpi-label">📅 이번 주 학습</p>
+      <p class="kpi-value">{{ ins.this_week }}<small>회</small></p>
+      {% set d = ins.week_delta %}
+      <p class="kpi-note"><span class="delta {{ 'up' if d > 0 else ('down' if d < 0 else 'flat') }}">{{ '▲' if d > 0 else ('▼' if d < 0 else '–') }} {{ d | abs }}회</span> 지난주보다</p>
+    </div>
+    <div class="card kpi">
+      <p class="kpi-label">🎯 정답률 <span class="muted">(최근 4주)</span></p>
+      <p class="kpi-value">{% if ins.accuracy_recent is not none %}{{ ins.accuracy_recent }}<small>%</small>{% else %}–{% endif %}</p>
+      {% set ad = ins.accuracy_delta %}
+      <p class="kpi-note">{% if ad is not none %}<span class="delta {{ 'up' if ad > 0 else ('down' if ad < 0 else 'flat') }}">{{ '▲' if ad > 0 else ('▼' if ad < 0 else '–') }} {{ ad | abs }}%p</span> 그 전 4주보다{% else %}퀴즈·카드를 풀면 정답률이 쌓여요{% endif %}</p>
+    </div>
+    <div class="card kpi">
+      <p class="kpi-label">🔔 오늘 복습</p>
+      <p class="kpi-value">{{ dashboard.reviews.due | length }}<small>개</small></p>
+      <p class="kpi-note">{% if dashboard.reviews.due %}아래 ‘복습 알림’에서 바로 풀 수 있어요{% else %}오늘 복습할 교안이 없어요 👍{% endif %}</p>
+    </div>
+  </div>
+
+  <div class="chart-grid">
+    {# ---------- 2) 주간 학습 횟수 (세로 막대, 이번 주 강조) ---------- #}
+    <figure class="card chart">
+      <figcaption>
+        <h3 class="chart-title">주간 학습 횟수</h3>
+        <p class="muted xsmall">최근 12주 · 퀴즈·카드를 푼 횟수 · <span class="key key-now"></span> 이번 주</p>
+      </figcaption>
+      <svg class="chart-svg" viewBox="0 0 {{ ins.chart_w }} {{ ins.chart_h }}" role="img"
+           aria-label="최근 12주 주간 학습 횟수. 이번 주 {{ ins.this_week }}회, 지난주 {{ ins.last_week }}회">
+        {% for t in ins.weekly_ticks %}
+        <line class="grid" x1="{{ ins.plot_left }}" x2="{{ ins.plot_right }}" y1="{{ t.y }}" y2="{{ t.y }}"></line>
+        <text class="tick" x="{{ ins.plot_left - 6 }}" y="{{ t.y }}" text-anchor="end" dominant-baseline="middle">{{ t.label }}</text>
+        {% endfor %}
+        {% for b in ins.weekly %}
+        <g class="mark-group" tabindex="0" data-tip="{{ b.range_label }} · {{ b.count }}회 학습{{ ' (이번 주)' if b.current }}">
+          <rect class="hit" x="{{ b.hit_x }}" y="0" width="{{ b.hit_w }}" height="{{ ins.baseline }}"></rect>
+          {% if b.path %}<path class="bar{{ ' now' if b.current }}" d="{{ b.path }}"></path>{% endif %}
+          {% if b.current or loop.index0 % 3 == 2 %}
+          <text class="tick" x="{{ b.x + b.width / 2 }}" y="{{ ins.baseline + 16 }}" text-anchor="middle">{{ '이번 주' if b.current else b.label }}</text>
+          {% endif %}
+          {% if b.current and b.count %}<text class="value" x="{{ b.x + b.width / 2 }}" y="{{ b.y - 6 }}" text-anchor="middle">{{ b.count }}</text>{% endif %}
+        </g>
+        {% endfor %}
+        <line class="axis" x1="{{ ins.plot_left }}" x2="{{ ins.plot_right }}" y1="{{ ins.baseline }}" y2="{{ ins.baseline }}"></line>
+      </svg>
+      <details class="chart-table"><summary>표로 보기</summary>
+        <table><thead><tr><th>주</th><th>학습 횟수</th></tr></thead>
+        <tbody>{% for b in ins.weekly | reverse %}<tr><td>{{ b.range_label }}{{ ' (이번 주)' if b.current }}</td><td>{{ b.count }}회</td></tr>{% endfor %}</tbody></table>
+      </details>
+    </figure>
+
+    {# ---------- 3) 주간 퀴즈 정답률 (꺾은선) ---------- #}
+    <figure class="card chart">
+      <figcaption>
+        <h3 class="chart-title">정답률</h3>
+        <p class="muted xsmall">최근 8주 · 퀴즈·카드에서 맞힌 비율 · 안 푼 주는 선이 끊겨요</p>
+      </figcaption>
+      <svg class="chart-svg" viewBox="0 0 {{ ins.chart_w }} {{ ins.chart_h }}" role="img"
+           aria-label="최근 8주 정답률{% if ins.accuracy_recent is not none %}, 최근 4주 {{ ins.accuracy_recent }}%{% endif %}">
+        {% for t in ins.accuracy_ticks %}
+        <line class="grid" x1="{{ ins.plot_left }}" x2="{{ ins.plot_right }}" y1="{{ t.y }}" y2="{{ t.y }}"></line>
+        <text class="tick" x="{{ ins.plot_left - 6 }}" y="{{ t.y }}" text-anchor="end" dominant-baseline="middle">{{ t.label }}</text>
+        {% endfor %}
+        {% for d in ins.accuracy_paths %}<path class="line" d="{{ d }}"></path>{% endfor %}
+        {% set last_point = ins.accuracy | selectattr("pct", "ne", none) | list | last %}
+        {% for p in ins.accuracy %}
+        <g class="mark-group" tabindex="0" data-tip="{{ p.range_label }} · {% if p.pct is not none %}정답률 {{ p.pct }}% ({{ p.quizzes }}번 풂){% else %}기록 없음{% endif %}">
+          <rect class="hit" x="{{ p.x - 30 }}" y="0" width="60" height="{{ ins.baseline }}"></rect>
+          {% if p.y is not none %}<circle class="dot" cx="{{ p.x }}" cy="{{ p.y }}" r="4"></circle>{% endif %}
+          {% if loop.index0 % 2 == 1 or loop.last %}<text class="tick" x="{{ p.x }}" y="{{ ins.baseline + 16 }}" text-anchor="middle">{{ '이번 주' if loop.last else p.label }}</text>{% endif %}
+          {% if last_point and p is sameas last_point %}<text class="value" x="{{ p.x }}" y="{{ p.y - 10 }}" text-anchor="middle">{{ p.pct }}%</text>{% endif %}
+        </g>
+        {% endfor %}
+        <line class="axis" x1="{{ ins.plot_left }}" x2="{{ ins.plot_right }}" y1="{{ ins.baseline }}" y2="{{ ins.baseline }}"></line>
+      </svg>
+      <details class="chart-table"><summary>표로 보기</summary>
+        <table><thead><tr><th>주</th><th>정답률</th><th>푼 횟수</th></tr></thead>
+        <tbody>{% for p in ins.accuracy | reverse %}<tr><td>{{ p.range_label }}</td><td>{{ (p.pct ~ '%') if p.pct is not none else '–' }}</td><td>{{ p.quizzes }}</td></tr>{% endfor %}</tbody></table>
+      </details>
+    </figure>
+
+    {# ---------- 4) 과목별 학습 비중 (순위 막대) ---------- #}
+    <figure class="card chart">
+      <figcaption>
+        <h3 class="chart-title">과목별 학습</h3>
+        <p class="muted xsmall">최근 12주 · 많이 공부한 과목 순서 · 총 {{ ins.course_total }}회</p>
+      </figcaption>
+      {% if ins.courses %}
+      <ul class="hbars">
+        {% for c in ins.courses %}
+        <li class="hbar-row" tabindex="0" data-tip="{{ c.name }} · {{ c.count }}회 ({{ c.pct }}%)">
+          <span class="hbar-name">{{ c.name }}</span>
+          <span class="hbar-track"><span class="hbar" style="width: {{ c.width_pct }}%"></span></span>
+          <span class="hbar-value">{{ c.count }}회</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="muted small">아직 학습 기록이 없어요. 챗봇에서 퀴즈·카드를 풀어 보세요.</p>
+      {% endif %}
+    </figure>
+
+    {# ---------- 5) 복습 현황 (한 줄로 나눈 막대) ---------- #}
+    <figure class="card chart">
+      <figcaption>
+        <h3 class="chart-title">복습 현황</h3>
+        <p class="muted xsmall">1일 → 3일 → 7일 간격 복습 · 교안 {{ ins.review_total }}개</p>
+      </figcaption>
+      {% if ins.review_total %}
+      <div class="segbar" role="img" aria-label="{% for p in ins.reviews %}{{ p.label }} {{ p.count }}개{{ ', ' if not loop.last }}{% endfor %}">
+        {% for p in ins.reviews if p.count %}
+        <span class="seg seg-{{ p.key }}" style="flex-grow: {{ p.count }}" tabindex="0" data-tip="{{ p.icon }} {{ p.label }} · {{ p.count }}개 ({{ p.pct | round | int }}%)">{% if p.pct >= 14 %}{{ p.count }}{% endif %}</span>
+        {% endfor %}
+      </div>
+      <ul class="legend">
+        {% for p in ins.reviews %}<li><span class="swatch seg-{{ p.key }}"></span>{{ p.icon }} {{ p.label }} {{ p.count }}개</li>{% endfor %}
+      </ul>
+      {% else %}
+      <p class="muted small">퀴즈를 풀면 복습 일정이 생겨요.</p>
+      {% endif %}
+    </figure>
+  </div>
+{% endif %}
+</section>

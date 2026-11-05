@@ -1,0 +1,37 @@
+{# 📄 교안 뷰어: 챗봇 옆 빈 공간에 출처 교안을 띄운다 #}
+<div class="viewer" data-viewer>
+  <div class="viewer-head">
+    <div class="viewer-heading">
+      <p class="viewer-kicker">📄 교안 보기</p>
+      <h2 class="viewer-title">{{ doc.title }}</h2>
+      <p class="muted xsmall">
+        {{ [doc.course_name, (doc.week_no ~ '주차') if doc.week_no else none] | select | join(' · ') }}
+        {% if doc.page %}· 📍 p.{{ doc.page }}{% endif %}
+      </p>
+    </div>
+    <button type="button" class="btn outline sm" hx-get="/ui/viewer" hx-target="#doc-viewer" hx-swap="innerHTML"
+            aria-label="교안 뷰어 닫기">닫기</button>
+  </div>
+
+  {% if doc.has_pdf %}
+    <iframe class="pdf-frame" src="/ui/viewer/{{ doc.id }}/file#page={{ doc.page or 1 }}" title="{{ doc.title }} PDF"></iframe>
+    <p class="muted xsmall">PDF 원본이에요{% if doc.page %} · {{ doc.page }}쪽을 열었어요{% endif %}.
+      <a href="/ui/viewer/{{ doc.id }}/file#page={{ doc.page or 1 }}" target="_blank" rel="noopener">새 창에서 크게 보기</a></p>
+  {% elif doc.blocks %}
+    <div class="doc-text" data-doc-text>
+      {% for b in doc.blocks %}
+      <section class="doc-page{% if b.highlight %} has-hl{% endif %}">
+        {% if b.page %}<p class="page-no">p.{{ b.page }}</p>{% endif %}
+        <p class="pre">{% if b.trimmed_start %}… {% endif %}{{ b.before }}{% if b.highlight %}<mark class="hl" data-viewer-hl>{{ b.highlight }}</mark>{{ b.after }}{% endif %}{% if b.trimmed_end %} …{% endif %}</p>
+      </section>
+      {% endfor %}
+    </div>
+    <p class="muted xsmall">
+      {% if doc.source_type == "pdf" %}원본 PDF가 보관되지 않은 교안이라 글자로 보여 드려요 (PDF를 다시 올리면 원본으로 보여요).
+      {% else %}글로 된 교안이에요.{% endif %}
+      {% if doc.highlighted %} <mark class="hl">노란색</mark>이 답변에 쓴 부분이에요.{% endif %}
+    </p>
+  {% else %}
+    <p class="muted small">이 교안의 본문을 불러오지 못했어요.</p>
+  {% endif %}
+</div>

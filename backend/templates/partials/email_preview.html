@@ -1,0 +1,23 @@
+{# 📧 메일 알림 미리보기 — 실제로 보내지 않고, 오늘 저녁 메일이 어떤 모습인지 보여준다.
+   메일 본문은 email_service가 만든 HTML을 sandbox iframe(srcdoc)에 넣어 그대로 보여준다.
+   (스크립트 실행 금지, 링크는 새 탭으로만 열림) #}
+<div class="email-preview" role="region" aria-label="메일 알림 미리보기">
+  <div class="email-preview-head">
+    <span class="badge warning">미리보기</span>
+    <span class="muted xsmall">추가 개발 예정 · 실제 발송은 메일 서비스 연결 후</span>
+    <button type="button" class="email-preview-close" aria-label="미리보기 닫기"
+            onclick="this.closest('.email-preview').remove()">✕</button>
+  </div>
+  <dl class="email-meta">
+    <div><dt>보낸 사람</dt><dd>{{ email.sender }}</dd></div>
+    <div><dt>받는 사람</dt><dd>{{ email.to or "로그인한 계정 메일" }}</dd></div>
+    <div><dt>제목</dt><dd><strong>{{ email.subject }}</strong></dd></div>
+  </dl>
+  <iframe class="email-frame" title="메일 본문 미리보기" sandbox="allow-popups allow-popups-to-escape-sandbox"
+          referrerpolicy="no-referrer" srcdoc="{{ email.html }}"></iframe>
+  <details class="email-text">
+    <summary class="xsmall">텍스트 버전 보기</summary>
+    <pre>{{ email.text }}</pre>
+  </details>
+  <p class="muted xsmall">푸시 알림과 같은 규칙(마감 임박 과제 → 복습할 교안 → 연속 학습 위기)으로 내용을 골랐어요.</p>
+</div>

@@ -18,7 +18,7 @@ from backend.schemas.models import (
     QuizResponse,
     QuizSubmitResponse,
 )
-from backend.services import pet_service, quiz_service, review_service, streak_service
+from backend.services import file_store, pet_service, quiz_service, review_service, streak_service
 from backend.services.agent_service import AgentService
 from backend.services.document_service import detect_source_type, ingest_document, parse_bytes, parse_plain_text
 from backend.services.embedding_service import EmbeddingService
@@ -86,6 +86,7 @@ async def upload_document(
     if has_file == has_text:
         raise BadRequestError("파일 또는 텍스트 중 하나만 보내 주세요.")
 
+    data = b""
     if has_file and file is not None:
         data = await file.read(settings.max_upload_bytes + 1)
         if len(data) > settings.max_upload_bytes:
@@ -95,7 +96,7 @@ async def upload_document(
         parsed = parse_plain_text(text or "")
 
     keyword_list = [k.strip() for k in (keywords or "").split(",") if k.strip()][:20]
-    return await ingest_document(
+    result = await ingest_document(
         db,
         EmbeddingService(settings),
         title=title.strip(),
@@ -105,6 +106,10 @@ async def upload_document(
         week_no=week_no,
         keywords=keyword_list,
     )
+    if parsed.source_type == "pdf" and data:
+        # 원본 PDF를 보관해 두면 뷰어에서 출처 쪽(p.3 등)을 바로 띄울 수 있다
+        result.original_saved = await file_store.save_pdf(db, result.document_id, data)
+    return result
 
 
 async def create_quiz(

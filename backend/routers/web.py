@@ -3,24 +3,33 @@
 - 페이지: GET /, /login
 - 폼 처리: POST /login, /signup, /logout
 - HTMX 조각(/ui/*): 화면 일부만 HTML로 돌려주어 교체한다. JS 프레임워크 없이 동적인 화면을 만든다.
+  · 챗봇: /ui/chat (질문 분류 → 답변), /ui/chat/summary·quiz (답변 밑 '이어서 하기' 단추)
+  · 교안 뷰어: /ui/viewer/<교안 ID> (출처 위치 표시), /ui/viewer/<교안 ID>/file (PDF 원본)
 """
 
 import json
 import logging
 import time
-from typing import Annotated, Any
-from uuid import UUID
+from typing import Annotated, Any, get_args
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, File, Form, Path, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from pydantic import TypeAdapter, ValidationError
 
-from backend.core.errors import AppError, BadRequestError
+from backend.core.errors import AppError, BadRequestError, NotFoundError
 from backend.core.supabase_client import DbDep, SettingsDep
 from backend.integrations.lms_client import LmsClient, LmsDep
 from backend.routers.deps import WebAgentDep
-from backend.schemas.models import ChatRequest, ChatTurn, Difficulty, DocumentItem
-from backend.services import career_service, lms_link_service, study_service, study_tools_service
+from backend.schemas.models import ChatRequest, ChatTurn, DashboardResponse, Difficulty, DocumentItem, RouteType
+from backend.services import (
+    career_service,
+    file_store,
+    insights_service,
+    lms_link_service,
+    study_service,
+    viewer_service,
+)
 from backend.web.session import (
     OptionalWebUser,
     WebUser,
@@ -39,7 +48,12 @@ router = APIRouter(include_in_schema=False)
 MAX_HISTORY = 10
 MAX_TURN_CHARS = 4000
 _history_adapter = TypeAdapter(list[ChatTurn])
-TABS = ("chat", "summary", "quiz", "flashcards", "mindmap", "career", "upload")
+ROUTES: tuple[str, ...] = get_args(RouteType)
+# ?tab= 값 → 위쪽 메뉴 화면. 예전 주소(?tab=quiz 등)는 모두 챗봇으로 (퀴즈·요약은 챗봇 안 단추로 옮김)
+VIEW_OF_TAB = {
+    "chat": "chat", "summary": "chat", "quiz": "chat", "flashcards": "chat", "mindmap": "chat",
+    "dashboard": "dashboard", "grades": "grades", "career": "grades", "upload": "upload",
+}
 
 
 def _render(request: Request, name: str, context: dict[str, Any], status_code: int = 200) -> HTMLResponse:
@@ -51,6 +65,17 @@ def _safe_int(value: object) -> int:
         return max(0, int(str(value)))
     except (TypeError, ValueError):
         return 0
+
+
+def _turn_id() -> str:
+    """한 번의 답변을 구별하는 짧은 이름 (출처 [1] 링크가 같은 답변의 출처 목록을 가리키게)."""
+    return uuid4().hex[:10]
+
+
+async def _insights_context(db: AsyncClient, user_id: UUID, dashboard: DashboardResponse | None) -> dict[str, Any]:
+    if dashboard is None:
+        return {"insights": None}
+    return {"insights": await insights_service.get_insights(db, user_id, dashboard)}
 
 
 def _parse_uuid(value: str | None) -> UUID | None:
@@ -135,6 +160,8 @@ async def dashboard_page(
         documents = await study_service.list_documents(db)
     except AppError as exc:
         error = exc.message
+    # 복습 알림(푸시)에서 들어오면 챗봇에 '퀴즈·카드 시작' 말풍선을 띄운다
+    quiz_doc_item = next((d for d in documents if quiz_doc and str(d.id) == quiz_doc), None)
 
     return _render(
         request,
@@ -144,8 +171,9 @@ async def dashboard_page(
             "dashboard": dashboard,
             "documents": documents,
             "error": error,
-            "active_tab": tab if tab in TABS else "chat",
-            "quiz_doc": quiz_doc or "",
+            "active_view": VIEW_OF_TAB.get(tab, "chat"),
+            "quiz_doc_item": quiz_doc_item,
+            **await _insights_context(db, user.id, dashboard),
             **await _lms_context(db, lms, user.id),
             **await _career_context(db, user.id),
             "vapid_public_key": settings.vapid_public_key if settings.push_enabled else None,
@@ -200,6 +228,7 @@ async def ui_chat(
     document_id: Annotated[str, Form()] = "",
     include_summary: Annotated[str | None, Form()] = None,
     history: Annotated[str, Form()] = "[]",
+    route: Annotated[str, Form(max_length=10)] = "",
 ) -> HTMLResponse:
     try:
         turns = _history_adapter.validate_json(history or "[]")[-MAX_HISTORY:]
@@ -212,6 +241,7 @@ async def ui_chat(
             document_id=_parse_uuid(document_id),
             history=turns,
             include_summary=include_summary is not None,
+            route=route if route in ROUTES else None,  # 비우면 AI가 질문 종류를 고른다
         )
     except ValidationError:
         raise BadRequestError("질문을 1~2000자로 입력해 주세요.") from None
@@ -233,24 +263,28 @@ async def ui_chat(
         {
             "question": chat_request.message,
             "result": result,
+            "turn_id": _turn_id(),
             "history_json": json.dumps([t.model_dump() for t in new_history], ensure_ascii=False),
         },
     )
 
 
-@router.post("/ui/summary", response_class=HTMLResponse)
-async def ui_summary(
+# 답변 밑 '이어서 하기' 단추: 교안을 코드가 바로 읽고 AI는 한 번만 불러서 빠르다
+@router.post("/ui/chat/summary", response_class=HTMLResponse)
+async def ui_chat_summary(
     request: Request, _user: WebUser, agent: WebAgentDep, document_id: Annotated[str, Form()] = ""
 ) -> HTMLResponse:
     doc_id = _parse_uuid(document_id)
     if doc_id is None:
-        raise BadRequestError("요약할 교안을 선택해 주세요.")
+        raise BadRequestError("요약할 교안을 골라 주세요.")
+    started = time.perf_counter()
     summary = await agent.summarize(doc_id)
-    return _render(request, "partials/summary.html", {"summary": summary})
+    elapsed = round((time.perf_counter() - started) * 1000)
+    return _render(request, "partials/chat_summary.html", {"summary": summary, "answer_ms": elapsed})
 
 
-@router.post("/ui/quiz", response_class=HTMLResponse)
-async def ui_quiz(
+@router.post("/ui/chat/quiz", response_class=HTMLResponse)
+async def ui_chat_quiz(
     request: Request,
     user: WebUser,
     db: DbDep,
@@ -258,8 +292,13 @@ async def ui_quiz(
     document_id: Annotated[str, Form()] = "",
     difficulty: Annotated[Difficulty, Form()] = "medium",
 ) -> HTMLResponse:
+    """퀴즈·카드 (예전 '퀴즈'와 '플래시카드'를 하나로): 카드로 풀고, 채점 뒤 카드를 뒤집어 해설을 본다."""
+    started = time.perf_counter()
     quiz = await study_service.create_quiz(agent, db, user.id, _parse_uuid(document_id), difficulty)
-    return _render(request, "partials/quiz_form.html", {"quiz": quiz, "started_at": int(time.time())})
+    elapsed = round((time.perf_counter() - started) * 1000)
+    return _render(
+        request, "partials/chat_quiz.html", {"quiz": quiz, "started_at": int(time.time()), "answer_ms": elapsed}
+    )
 
 
 @router.post("/ui/quiz/{quiz_id}/submit", response_class=HTMLResponse)
@@ -278,7 +317,13 @@ async def ui_quiz_submit(request: Request, quiz_id: UUID, user: WebUser, db: DbD
     return _render(
         request,
         "partials/quiz_result.html",
-        {"result": result, "questions": questions, "dashboard": dashboard, "oob": True},
+        {
+            "result": result,
+            "questions": questions,
+            "dashboard": dashboard,
+            "oob": True,
+            **await _insights_context(db, user.id, dashboard),
+        },
     )
 
 
@@ -387,49 +432,39 @@ async def ui_lms_sync(request: Request, user: WebUser, db: DbDep, settings: Sett
 
 
 # ---------------------------------------------------------------------
-# 노트북LM 참고 학습 도구 조각
+# 📄 교안 뷰어 (챗봇 옆 빈 공간)
 # ---------------------------------------------------------------------
-@router.post("/ui/flashcards", response_class=HTMLResponse)
-async def ui_flashcards(
-    request: Request, _user: WebUser, agent: WebAgentDep, document_id: Annotated[str, Form()] = ""
+@router.get("/ui/viewer", response_class=HTMLResponse)
+async def ui_viewer_empty(request: Request, _user: WebUser, db: DbDep) -> HTMLResponse:
+    return _render(request, "partials/viewer_empty.html", {"documents": await study_service.list_documents(db)})
+
+
+@router.get("/ui/viewer/{document_id}", response_class=HTMLResponse)
+async def ui_viewer(
+    request: Request,
+    document_id: UUID,
+    _user: WebUser,
+    db: DbDep,
+    chunk: Annotated[UUID | None, Query()] = None,
+    page: Annotated[int | None, Query(ge=1, le=5000)] = None,
 ) -> HTMLResponse:
-    doc_id = _parse_uuid(document_id)
-    if doc_id is None:
-        raise BadRequestError("플래시카드를 만들 교안을 선택해 주세요.")
-    deck = await agent.generate_flashcards(doc_id)
-    return _render(request, "partials/flashcards.html", {"deck": deck, "started_at": int(time.time())})
+    doc = await viewer_service.load(db, document_id, chunk, page)
+    return _render(request, "partials/viewer.html", {"doc": doc})
 
 
-@router.post("/ui/flashcards/submit", response_class=HTMLResponse)
-async def ui_flashcards_submit(request: Request, user: WebUser, db: DbDep) -> HTMLResponse:
-    form = await request.form()
-    doc_id = _parse_uuid(str(form.get("document_id", "")))
-    total = min(_safe_int(form.get("card_count")), 12)
-    if doc_id is None or total == 0:
-        raise BadRequestError("플래시카드 정보가 올바르지 않습니다.")
-    marks = [str(form.get(f"card_{i}", "")) for i in range(total)]
-    if any(m not in ("know", "again") for m in marks):
-        raise BadRequestError("모든 카드에 '알아요' 또는 '다시 볼래요'를 골라 주세요.")
-    known = marks.count("know")
-    again = [str(form.get(f"front_{i}", ""))[:80] for i, m in enumerate(marks) if m == "again"]
-    started_at = _safe_int(form.get("started_at"))
-    duration = max(0, min(int(time.time()) - started_at, 86_400)) if started_at else None
-
-    await study_service.require_document(db, doc_id)
-    await study_tools_service.record_flashcard_session(db, user.id, doc_id, known, total, duration)
-    dashboard = await study_service.get_dashboard(db, user.id)
-    return _render(
-        request,
-        "partials/flashcard_result.html",
-        {"known": known, "total": total, "again": again, "dashboard": dashboard, "oob": True},
+@router.get("/ui/viewer/{document_id}/file")
+async def ui_viewer_file(document_id: UUID, _user: WebUser, db: DbDep) -> Response:
+    """보관된 PDF 원본. 같은 사이트의 뷰어(iframe) 안에서만 열리게 한다."""
+    data = await file_store.load_pdf(db, document_id)
+    if data is None:
+        raise NotFoundError("이 교안은 PDF 원본이 보관되어 있지 않아요.")
+    return Response(
+        content=data,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{document_id}.pdf"',
+            "Cache-Control": "private, max-age=300",
+            "X-Frame-Options": "SAMEORIGIN",
+            "Content-Security-Policy": "frame-ancestors 'self'",
+        },
     )
-
-
-@router.post("/ui/mindmap", response_class=HTMLResponse)
-async def ui_mindmap(
-    request: Request, _user: WebUser, agent: WebAgentDep, document_id: Annotated[str, Form()] = ""
-) -> HTMLResponse:
-    doc_id = _parse_uuid(document_id)
-    if doc_id is None:
-        raise BadRequestError("마인드맵을 만들 교안을 선택해 주세요.")
-    return _render(request, "partials/mindmap.html", {"mindmap": await agent.generate_mindmap(doc_id)})

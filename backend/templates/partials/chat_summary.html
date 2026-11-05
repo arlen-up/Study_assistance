@@ -1,0 +1,24 @@
+{% import "partials/_macros.html" as m %}
+{# 챗봇 안의 '⏱ 3분 요약' 단추 결과 #}
+<div class="bubble-row user"><div class="bubble user">⏱ ‘{{ summary.document_title }}’ 3분 요약해 줘</div></div>
+<div class="bubble-row bot">
+  <article class="bubble bot" aria-label="3분 요약">
+    <div class="bubble-meta">
+      <span class="badge route route-study">⏱ 3분 요약</span>
+      {% if answer_ms %}<span class="muted xsmall">{{ answer_ms | seconds }}</span>{% endif %}
+    </div>
+    <h3 class="bubble-title">{{ summary.document_title }}</h3>
+    <div class="tags">{% for k in summary.keywords %}<span class="badge secondary">#{{ k }}</span>{% endfor %}</div>
+    <section>
+      <h4 class="small-title">핵심 포인트</h4>
+      <ol class="points">{% for point in summary.key_points %}<li>{{ point }}</li>{% endfor %}</ol>
+    </section>
+    <section class="mini-summary">
+      <p class="mini-summary-title">⏱ 3분 안에 읽기</p>
+      <div class="md">{{ summary.three_minute_summary | markdown }}</div>
+    </section>
+    {{ m.sources(summary.sources) }}
+    {{ m.tool_calls(summary.tool_calls) }}
+    {{ m.followups(summary.document_id, summary.document_title, skip="summary") }}
+  </article>
+</div>

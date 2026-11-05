@@ -12,7 +12,7 @@ from starlette.middleware.base import RequestResponseEndpoint
 
 from backend import __version__
 from backend.core.errors import AppError
-from backend.routers import api, web
+from backend.routers import api, notify, web
 from backend.web.session import LoginRequiredError, clear_session_cookies, set_session_cookies
 from backend.web.templating import templates
 from lms_mock.app import app as lms_app
@@ -116,6 +116,7 @@ def create_app() -> FastAPI:
     # ---------------- 라우터 · 정적 파일 ----------------
     app.include_router(api.router)
     app.include_router(web.router)
+    app.include_router(notify.router)
 
     # 🏫 가상 LMS 모의 서버: 독립 FastAPI 앱을 /lms 에 연결 (→ /lms/api/*, 문서 /lms/api/docs)
     app.mount("/lms", lms_app, name="lms")
