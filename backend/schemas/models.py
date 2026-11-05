@@ -1,0 +1,297 @@
+"""API 요청/응답 및 LLM 구조화 출력용 Pydantic 모델."""
+
+import datetime as dt
+from typing import Any, Literal
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+
+class RequestModel(BaseModel):
+    """클라이언트 입력: 알 수 없는 필드 거부, 앞뒤 공백 제거."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
+# ---------------------------------------------------------------------
+# 공통
+# ---------------------------------------------------------------------
+class AuthUser(BaseModel):
+    id: UUID
+    email: str | None = None
+
+
+class ErrorBody(BaseModel):
+    code: str
+    message: str
+
+
+class ErrorResponse(BaseModel):
+    error: ErrorBody
+
+
+class HealthResponse(BaseModel):
+    status: Literal["ok", "degraded"]
+    config_ok: bool
+    missing_env: list[str] = Field(default_factory=list)
+    version: str
+
+
+class SourceChunk(BaseModel):
+    """RAG 답변의 출처(교안 청크)."""
+
+    chunk_id: UUID
+    document_id: UUID
+    document_title: str
+    chunk_index: int
+    page_number: int | None = None
+    similarity: float
+    content: str
+
+
+class ToolCallTrace(BaseModel):
+    """에이전트가 호출한 MCP 도구 기록 (디버깅·데모용)."""
+
+    name: str
+    arguments: dict[str, Any]
+    ok: bool
+
+
+# ---------------------------------------------------------------------
+# 문서
+# ---------------------------------------------------------------------
+class DocumentItem(BaseModel):
+    id: UUID
+    title: str
+    course_name: str | None = None
+    week_no: int | None = None
+    keywords: list[str] = Field(default_factory=list)
+    created_at: dt.datetime
+
+
+class DocumentListResponse(BaseModel):
+    documents: list[DocumentItem]
+
+
+class DocumentIngestResponse(BaseModel):
+    document_id: UUID
+    title: str
+    chunk_count: int
+    char_count: int
+
+
+# ---------------------------------------------------------------------
+# 챗봇 (RAG)
+# ---------------------------------------------------------------------
+class ChatTurn(RequestModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4000)
+
+
+class ChatRequest(RequestModel):
+    message: str = Field(min_length=1, max_length=2000)
+    document_id: UUID | None = None
+    history: list[ChatTurn] = Field(default_factory=list, max_length=10)
+    include_summary: bool = False
+
+
+class ChatDraft(BaseModel):
+    """LLM 구조화 출력: 챗봇 답변."""
+
+    answer: str = Field(description="학생 질문에 대한 한국어 답변. 근거 자료에 없는 내용은 지어내지 말 것.")
+    three_minute_summary: str | None = Field(
+        default=None, description="요청된 경우에만: 3분 안에 읽을 수 있는 핵심 요약(500~900자)."
+    )
+    confidence: Literal["high", "medium", "low"] = Field(description="근거 자료로 답변이 뒷받침되는 정도.")
+    cited_chunk_ids: list[str] = Field(default_factory=list, description="답변 근거로 사용한 chunk_id 목록.")
+
+
+class ChatResponse(BaseModel):
+    answer: str
+    three_minute_summary: str | None = None
+    confidence: Literal["high", "medium", "low"]
+    sources: list[SourceChunk]
+    tool_calls: list[ToolCallTrace]
+
+
+# ---------------------------------------------------------------------
+# 3분 요약
+# ---------------------------------------------------------------------
+class SummaryRequest(RequestModel):
+    document_id: UUID
+
+
+class SummaryDraft(BaseModel):
+    """LLM 구조화 출력: 3분 핵심 요약."""
+
+    three_minute_summary: str = Field(description="3분 안에 읽을 수 있는 핵심 요약(600~900자, 한국어).")
+    key_points: list[str] = Field(min_length=3, max_length=5, description="핵심 포인트 3~5개, 각각 한 문장.")
+    keywords: list[str] = Field(min_length=1, max_length=8, description="교안 핵심 키워드.")
+    cited_chunk_ids: list[str] = Field(default_factory=list, description="요약 근거로 사용한 chunk_id 목록.")
+
+
+class SummaryResponse(BaseModel):
+    document_id: UUID
+    document_title: str
+    three_minute_summary: str
+    key_points: list[str]
+    keywords: list[str]
+    sources: list[SourceChunk]
+    tool_calls: list[ToolCallTrace]
+
+
+# ---------------------------------------------------------------------
+# 적응형 마이크로 퀴즈
+# ---------------------------------------------------------------------
+QuizType = Literal["multiple_choice", "ox", "code_blank"]
+Difficulty = Literal["easy", "medium", "hard"]
+CODE_BLANK_MARK = "____"
+
+
+class QuizQuestionDraft(BaseModel):
+    """LLM 구조화 출력: 퀴즈 1문항.
+
+    여러 OpenAI 호환 서버에서 안정적으로 동작하도록 union 대신 평평한(flat) 스키마를 쓰고,
+    유형별 규칙은 검증기로 강제한다.
+    """
+
+    type: QuizType = Field(description="multiple_choice | ox | code_blank")
+    question: str = Field(min_length=5, description="문제 본문 (한국어).")
+    options: list[str] = Field(
+        default_factory=list, description="multiple_choice일 때만 보기 4개. 그 외 유형은 빈 배열."
+    )
+    code: str | None = Field(default=None, description=f"code_blank일 때만: 빈칸을 {CODE_BLANK_MARK} 로 표시한 코드.")
+    language: str | None = Field(default=None, description="code_blank일 때 프로그래밍 언어 (예: python).")
+    answer: str = Field(min_length=1, description="정답. multiple_choice는 보기 문자열 그대로, ox는 'O' 또는 'X'.")
+    explanation: str = Field(min_length=5, description="정답 해설 (한국어, 2~3문장).")
+    source_chunk_id: str | None = Field(default=None, description="문제 근거 chunk_id.")
+
+    @model_validator(mode="after")
+    def _validate_by_type(self) -> "QuizQuestionDraft":
+        self.answer = self.answer.strip()
+        if self.type == "multiple_choice":
+            opts = [o.strip() for o in self.options if o.strip()]
+            if len(opts) != 4 or len(set(opts)) != 4:
+                raise ValueError("객관식은 서로 다른 보기 4개가 필요합니다")
+            if self.answer not in opts:
+                raise ValueError("객관식 정답은 보기 중 하나와 정확히 같아야 합니다")
+            self.options = opts
+            self.code = None
+        elif self.type == "ox":
+            normalized = self.answer.upper()
+            if normalized not in {"O", "X"}:
+                raise ValueError("O/X 문제의 정답은 'O' 또는 'X' 여야 합니다")
+            self.answer = normalized
+            self.options = ["O", "X"]
+            self.code = None
+        else:  # code_blank
+            if not self.code or CODE_BLANK_MARK not in self.code:
+                raise ValueError(f"코드 빈칸 문제는 {CODE_BLANK_MARK} 가 포함된 code가 필요합니다")
+            self.options = []
+        return self
+
+
+class QuizDraft(BaseModel):
+    """LLM 구조화 출력: 퀴즈 3문항 세트."""
+
+    keywords: list[str] = Field(min_length=1, max_length=8, description="오늘 교안의 핵심 키워드.")
+    questions: list[QuizQuestionDraft] = Field(min_length=3, max_length=3, description="정확히 3문항.")
+
+
+class QuizGenerateRequest(RequestModel):
+    document_id: UUID | None = Field(default=None, description="비우면 가장 최근 교안(오늘의 교안)을 사용")
+    difficulty: Difficulty = "medium"
+
+
+class PublicQuizQuestion(BaseModel):
+    """클라이언트에 보내는 문항 (정답·해설 제외)."""
+
+    index: int
+    type: QuizType
+    question: str
+    options: list[str]
+    code: str | None = None
+    language: str | None = None
+
+
+class QuizResponse(BaseModel):
+    quiz_id: UUID
+    document_id: UUID
+    document_title: str
+    difficulty: Difficulty
+    keywords: list[str]
+    questions: list[PublicQuizQuestion]
+    tool_calls: list[ToolCallTrace] = Field(default_factory=list)
+
+
+class QuizSubmitRequest(RequestModel):
+    answers: list[str] = Field(min_length=1, max_length=10)
+    duration_seconds: int | None = Field(default=None, ge=0, le=86_400)
+
+    @field_validator("answers")
+    @classmethod
+    def _limit_answer_length(cls, values: list[str]) -> list[str]:
+        if any(len(v) > 500 for v in values):
+            raise ValueError("답안은 500자 이하여야 합니다")
+        return values
+
+
+class QuestionResult(BaseModel):
+    index: int
+    correct: bool
+    your_answer: str
+    correct_answer: str
+    explanation: str
+
+
+# ---------------------------------------------------------------------
+# 에빙하우스 복습
+# ---------------------------------------------------------------------
+class ReviewItem(BaseModel):
+    document_id: UUID
+    document_title: str
+    last_studied_at: dt.datetime
+    review_count: int
+    review_1d_at: dt.datetime
+    review_3d_at: dt.datetime
+    review_7d_at: dt.datetime
+    next_review_at: dt.datetime | None = None
+    is_due: bool
+    stage_label: str
+
+
+class ReviewListResponse(BaseModel):
+    due: list[ReviewItem]
+    upcoming: list[ReviewItem]
+    mastered: list[ReviewItem]
+
+
+class QuizSubmitResponse(BaseModel):
+    quiz_id: UUID
+    score: int
+    total: int
+    results: list[QuestionResult]
+    study_log_id: UUID
+    review: ReviewItem | None = None
+
+
+# ---------------------------------------------------------------------
+# 잔디(스트릭)
+# ---------------------------------------------------------------------
+class HeatmapDay(BaseModel):
+    date: dt.date
+    completed: bool
+    count: int
+
+
+class StreakResponse(BaseModel):
+    days: list[HeatmapDay]
+    current_streak: int
+    longest_streak: int
+    active_days: int
+    total_days: int
+
+
+class DashboardResponse(BaseModel):
+    streak: StreakResponse
+    reviews: ReviewListResponse
