@@ -136,18 +136,22 @@ h1, h2, h3, h4 { margin: 0; }
 .stat-value small { font-size: .8rem; font-weight: 400; color: var(--muted); margin-left: 2px; }
 
 /* ---------- 잔디 ---------- */
-.heatmap-scroll { overflow-x: auto; padding-bottom: 6px; margin-top: 12px; }
-.heatmap { display: inline-flex; gap: 3px; }
-.heatmap-week { display: flex; flex-direction: column; gap: 3px; }
-.heatmap-month { height: 14px; font-size: 10px; color: var(--muted); white-space: nowrap; }
-.heatmap-daylabel { height: 11px; font-size: 9px; line-height: 11px; color: var(--muted); padding-right: 4px; }
 .cell { width: 11px; height: 11px; border-radius: 2px; display: inline-block; }
-.cell.empty-cell { background: transparent; }
 .lv0 { background: var(--grass-0); }
 .lv1 { background: var(--grass-1); }
 .lv2 { background: var(--grass-2); }
 .lv3 { background: var(--grass-3); }
 .lv4 { background: var(--grass-4); }
+/* 월별 달력 */
+.month-cal { margin-top: 12px; }
+.month-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.month-head { display: grid; justify-items: center; gap: 2px; }
+.month-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; max-width: 420px; margin: 0 auto; }
+.month-dow { text-align: center; font-size: 11px; color: var(--muted); padding-bottom: 2px; }
+.month-day { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 6px; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--text, #18181b); }
+.month-day.blank { background: transparent; }
+.month-day.outside { background: transparent; color: #d4d4d8; }
+.month-day.lv3, .month-day.lv4 { color: #fff; font-weight: 700; }
 .heatmap-legend { display: flex; justify-content: flex-end; align-items: center; gap: 3px; font-size: 11px; margin-top: 6px; }
 
 /* ---------- 탭 (라디오 + CSS) ---------- */

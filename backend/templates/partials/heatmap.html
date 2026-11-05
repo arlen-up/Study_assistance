@@ -1,27 +1,33 @@
-{# GitHub식 학습 잔디: 열 = 주(일~토), 칸 색 = 그날 학습 횟수 #}
+{# 월별 학습 잔디: 달력 한 장 = 한 달, ◀ ▶ 로 넘겨 본다 (동작은 /static/js/app.js)
+   JS가 없어도 이번 달은 보인다. 칸 색 = 그날 학습 횟수 #}
+{% set months = build_month_calendars(dashboard.streak.days) %}
 <section id="heatmap" class="card"{% if oob %} hx-swap-oob="true"{% endif %}>
   <h2 class="card-title">🌱 학습 잔디</h2>
   <p class="muted small">최근 {{ dashboard.streak.total_days }}일 중 <strong>{{ dashboard.streak.active_days }}일</strong> 학습했어요</p>
-  <div class="heatmap-scroll">
-    <div class="heatmap">
-      <div class="heatmap-week heatmap-labels" aria-hidden="true">
-        <span class="heatmap-month"></span>
-        {% for d in ["", "월", "", "수", "", "금", ""] %}<span class="heatmap-daylabel">{{ d }}</span>{% endfor %}
+  {% for cal in months %}
+  <div class="month-cal" data-month="{{ cal.key }}"{% if not loop.last %} hidden{% endif %}>
+    <div class="month-nav">
+      <button type="button" class="btn outline sm" data-month-nav="-1" aria-label="이전 달"{% if loop.first %} disabled{% endif %}>◀</button>
+      <div class="month-head" aria-live="polite">
+        <strong>{{ cal.label }}</strong>
+        <span class="muted xsmall">{{ cal.active_days }}일 학습 · 총 {{ cal.total_count }}회</span>
       </div>
-      {% for week in build_heatmap(dashboard.streak.days) %}
-      <div class="heatmap-week">
-        <span class="heatmap-month">{{ week.month_label }}</span>
-        {% for cell in week.cells %}
-          {% if cell %}
-          <span class="cell lv{{ cell.level }}" title="{{ cell.date }} · {{ (cell.count ~ '회 학습') if cell.count else '학습 없음' }}"></span>
-          {% else %}
-          <span class="cell empty-cell"></span>
-          {% endif %}
-        {% endfor %}
-      </div>
-      {% endfor %}
+      <button type="button" class="btn outline sm" data-month-nav="1" aria-label="다음 달"{% if loop.last %} disabled{% endif %}>▶</button>
+    </div>
+    <div class="month-grid" role="grid" aria-label="{{ cal.label }} 학습 기록">
+      {% for d in ["일", "월", "화", "수", "목", "금", "토"] %}<span class="month-dow">{{ d }}</span>{% endfor %}
+      {% for week in cal.weeks %}{% for cell in week %}
+        {% if cell is none %}
+        <span class="month-day blank"></span>
+        {% elif cell.outside %}
+        <span class="month-day outside">{{ cell.date.day }}</span>
+        {% else %}
+        <span class="month-day lv{{ cell.level }}" title="{{ cell.date.month }}월 {{ cell.date.day }}일 · {{ (cell.count ~ '회 학습') if cell.count else '학습 없음' }}">{{ cell.date.day }}</span>
+        {% endif %}
+      {% endfor %}{% endfor %}
     </div>
   </div>
+  {% endfor %}
   <div class="heatmap-legend muted">
     적음 {% for lv in range(5) %}<span class="cell lv{{ lv }}"></span>{% endfor %} 많음
   </div>
