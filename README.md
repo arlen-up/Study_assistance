@@ -38,7 +38,7 @@ lms_mock/                   🏫🏛 가상 학교 시스템 (도우미와 독�
   moodle.py                 가상 코스모스: /lms/webservice/rest/server.php (Moodle 4.5 규격)
   app.py                    가상 학사정보: /lms/api/* (성적표·졸업 요건·과목)
 public/static/              CSS, htmx (Vercel CDN이 직접 제공)
-supabase/migrations/        DB 스키마 (2개)
+supabase/migrations/        DB 스키마 (3개)
 docs/                       진행상황 문서, 예시 교안
 ```
 
