@@ -320,12 +320,24 @@ class LmsLinkStatus(BaseModel):
 PetMood = Literal["new", "happy", "waiting", "sad"]
 
 
+class PetStageInfo(BaseModel):
+    key: str
+    label: str
+    emoji: str
+    image_url: str | None = None
+    min_streak: int
+    reached: bool
+    current: bool
+
+
 class PetStatus(BaseModel):
     name: str
     theme: str
     stage_key: str
     stage_label: str
     emoji: str
+    image_url: str | None = None
+    stages: list[PetStageInfo] = []
     mood: PetMood
     message: str
     current_streak: int

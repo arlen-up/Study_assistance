@@ -1,6 +1,6 @@
 """가상 펫 (게이미피케이션).
 
-🎨 펫 컨셉(이름·성장 단계·이모지·문구)은 이 파일의 PetTheme 하나에 모여 있다.
+🎨 펫 컨셉(이름·성장 단계·이모지·그림·문구)은 이 파일의 PetTheme 하나에 모여 있다.
    컨셉을 바꾸려면 새 PetTheme을 만들고 ACTIVE_THEME만 바꾸면 된다. (DB에는 펫 이름만 저장)
 
 상태 계산
@@ -10,7 +10,7 @@
 
 from dataclasses import dataclass, field
 
-from backend.schemas.models import PetMood, PetStatus, StreakResponse
+from backend.schemas.models import PetMood, PetStageInfo, PetStatus, StreakResponse
 
 
 @dataclass(frozen=True)
@@ -19,6 +19,7 @@ class PetStage:
     min_streak: int   # 이 연속 학습일부터 이 단계
     emoji: str
     label: str
+    image: str = ""   # 그림 주소 (public/static/img/...). 비우면 이모지로 보여줌
 
 
 @dataclass(frozen=True)
@@ -35,10 +36,10 @@ BUTTERFLY = PetTheme(
     key="butterfly",
     default_name="나비",
     stages=(
-        PetStage("egg", 0, "🥚", "알"),
-        PetStage("larva", 1, "🐛", "애벌레"),
-        PetStage("pupa", 3, "🌰", "번데기"),
-        PetStage("butterfly", 7, "🦋", "나비"),
+        PetStage("egg", 0, "🥚", "알", "/static/img/pet/egg.svg"),
+        PetStage("larva", 1, "🐛", "애벌레", "/static/img/pet/larva.svg"),
+        PetStage("pupa", 3, "🌰", "번데기", "/static/img/pet/pupa.svg"),
+        PetStage("butterfly", 7, "🦋", "나비", "/static/img/pet/butterfly.svg"),
     ),
     mood_messages={
         "new": "첫 퀴즈를 풀면 {name}{이가} 알에서 깨어나요!",
@@ -106,6 +107,12 @@ def pet_status(streak: StreakResponse, pet_name: str | None, theme: PetTheme = A
         stage_key=stage.key,
         stage_label=stage.label,
         emoji=stage.emoji,
+        image_url=stage.image or None,
+        stages=[
+            PetStageInfo(key=s.key, label=s.label, emoji=s.emoji, image_url=s.image or None,
+                         min_streak=s.min_streak, reached=current >= s.min_streak, current=s is stage)
+            for s in theme.stages
+        ],
         mood=mood,
         message=fill(theme.mood_messages[mood], name, streak=current, next=current + 1),
         current_streak=current,

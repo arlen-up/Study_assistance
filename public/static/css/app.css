@@ -288,15 +288,29 @@ h1, h2, h3, h4 { margin: 0; }
 .encourage { font-weight: 600; color: #065f46; }
 
 /* ---------- 가상 펫 · 푸시 ---------- */
-.pet-card { display: flex; gap: 16px; align-items: center; }
-.pet-emoji { font-size: 3.2rem; line-height: 1; width: 72px; height: 72px; display: grid; place-items: center; background: var(--accent-soft); border-radius: 50%; flex: none; }
-.pet-body { display: grid; gap: 6px; flex: 1; min-width: 0; }
-.pet-name { font-weight: 800; font-size: 1.05rem; display: flex; gap: 6px; align-items: center; }
-.pet-card.mood-happy .pet-emoji { animation: pet-bounce 1.6s ease-in-out infinite; }
-.pet-card.mood-sad .pet-emoji { filter: grayscale(.6); background: #f4f4f5; }
+/* 잔디(왼쪽 절반) + 펫(오른쪽 절반) */
+.grass-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: stretch; }
+.grass-row > .card { min-width: 0; }
+@media (max-width: 760px) { .grass-row { grid-template-columns: 1fr; } }
+.pet-card { display: grid; gap: 6px; justify-items: center; text-align: center; align-content: start; }
+.pet-card .card-title { justify-self: start; }
+.pet-figure { width: 180px; height: 180px; display: grid; place-items: center; background: radial-gradient(circle at 50% 55%, var(--accent-soft) 0 62%, transparent 63%); }
+.pet-image { width: 170px; height: 170px; }
+.pet-emoji { font-size: 5rem; line-height: 1; }
+.pet-name { font-weight: 800; font-size: 1.05rem; display: flex; gap: 6px; align-items: center; justify-content: center; }
+.pet-message { max-width: 46ch; text-wrap: balance; word-break: keep-all; }
+.pet-card .progress { width: 100%; max-width: 260px; }
+.pet-stages { list-style: none; display: flex; gap: 6px; padding: 0; margin: 8px 0 0; }
+.pet-stages li { display: grid; justify-items: center; gap: 2px; padding: 6px 8px; border-radius: 8px; color: var(--muted); }
+.pet-stages li img, .pet-stages li > span[aria-hidden] { width: 36px; height: 36px; font-size: 1.6rem; filter: grayscale(1); opacity: .35; }
+.pet-stages li.reached img, .pet-stages li.reached > span[aria-hidden] { filter: none; opacity: .8; }
+.pet-stages li.current { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+.pet-stages li.current img, .pet-stages li.current > span[aria-hidden] { filter: none; opacity: 1; }
+.pet-card.mood-happy .pet-image, .pet-card.mood-happy .pet-emoji { animation: pet-bounce 1.6s ease-in-out infinite; }
+.pet-card.mood-sad .pet-image, .pet-card.mood-sad .pet-emoji { filter: grayscale(.6); }
 .pet-card.mood-waiting { border-color: #fcd34d; }
 @keyframes pet-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-@media (prefers-reduced-motion: reduce) { .pet-card.mood-happy .pet-emoji { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .pet-card.mood-happy .pet-image, .pet-card.mood-happy .pet-emoji { animation: none; } }
 .push-actions { margin: 8px 0; }
 .sync-row { justify-content: space-between; margin-top: 8px; }
 

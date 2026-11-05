@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="나비">
+  <ellipse cx="100" cy="186" rx="44" ry="7" fill="#000" opacity=".08"/>
+  <path d="M96 92C76 46 30 30 18 52s6 62 46 66c-30 8-40 34-26 46s46 0 58-40z" fill="#60a5fa" stroke="#1d4ed8" stroke-width="3"/>
+  <path d="M104 92c20-46 66-62 78-40s-6 62-46 66c30 8 40 34 26 46s-46 0-58-40z" fill="#60a5fa" stroke="#1d4ed8" stroke-width="3"/>
+  <path d="M92 96C78 66 48 54 38 66s4 36 36 40" fill="#a78bfa"/><path d="M108 96c14-30 44-42 54-30s-4 36-36 40" fill="#a78bfa"/>
+  <path d="M90 118c-20 6-32 20-26 30s26 0 30-18" fill="#f9a8d4"/><path d="M110 118c20 6 32 20 26 30s-26 0-30-18" fill="#f9a8d4"/>
+  <g fill="#fff" opacity=".9"><circle cx="44" cy="60" r="6"/><circle cx="156" cy="60" r="6"/><circle cx="56" cy="148" r="4"/><circle cx="144" cy="148" r="4"/></g>
+  <path d="M94 58q-10-22-22-26M106 58q10-22 22-26" stroke="#1e3a8a" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <circle cx="72" cy="32" r="5" fill="#f472b6"/><circle cx="128" cy="32" r="5" fill="#f472b6"/>
+  <rect x="90" y="76" width="20" height="78" rx="10" fill="#1e3a8a"/>
+  <circle cx="100" cy="70" r="20" fill="#fde68a" stroke="#1e3a8a" stroke-width="3"/>
+  <circle cx="93" cy="68" r="4" fill="#27272a"/><circle cx="107" cy="68" r="4" fill="#27272a"/>
+  <circle cx="94.5" cy="66.5" r="1.4" fill="#fff"/><circle cx="108.5" cy="66.5" r="1.4" fill="#fff"/>
+  <ellipse cx="86" cy="77" rx="4.5" ry="2.6" fill="#fda4af"/><ellipse cx="114" cy="77" rx="4.5" ry="2.6" fill="#fda4af"/>
+  <path d="M95 78q5 5 10 0" stroke="#27272a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+</svg>

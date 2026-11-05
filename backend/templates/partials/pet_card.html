@@ -1,19 +1,34 @@
-{# 🦋 가상 펫 카드 — 컨셉(이모지·문구)은 backend/services/pet_service.py 에서 바꾼다 #}
+{# 🦋 가상 펫 카드 (학습 잔디 옆) — 컨셉(이모지·그림·문구)은 backend/services/pet_service.py 에서 바꾼다 #}
 {% set pet = dashboard.pet %}
 {% if pet %}
 <section id="pet-card" class="card pet-card mood-{{ pet.mood }}"{% if oob %} hx-swap-oob="true"{% endif %}>
-  <div class="pet-emoji" aria-hidden="true">{{ pet.emoji }}</div>
-  <div class="pet-body">
-    <p class="pet-name">{{ pet.name }} <span class="badge secondary">{{ pet.stage_label }}</span></p>
-    <p class="small">{{ pet.message }}</p>
-    {% if pet.next_stage_label %}
-    <div class="progress" role="img" aria-label="다음 단계까지 {{ pet.days_to_next }}일">
-      <span class="done" style="width: {{ pet.progress_percent }}%"></span>
-    </div>
-    <p class="muted xsmall">{{ pet.days_to_next }}일 더 연속으로 공부하면 {{ pet.next_stage_label | with_ro }} 자라요</p>
+  <h2 class="card-title">{{ pet.emoji }} 나의 {{ pet.name }}</h2>
+  <div class="pet-figure">
+    {% if pet.image_url %}
+    <img class="pet-image" src="{{ pet.image_url }}" alt="{{ pet.name }} — {{ pet.stage_label }} 단계" width="180" height="180">
     {% else %}
-    <p class="muted xsmall">최고 단계에 도달했어요! 연속 기록을 지켜 주세요.</p>
+    <div class="pet-emoji" aria-hidden="true">{{ pet.emoji }}</div>
     {% endif %}
   </div>
+  <p class="pet-name">{{ pet.name }} <span class="badge secondary">{{ pet.stage_label }} 단계</span></p>
+  <p class="small pet-message">{{ pet.message }}</p>
+  {% if pet.next_stage_label %}
+  <div class="progress" role="img" aria-label="다음 단계까지 {{ pet.days_to_next }}일">
+    <span class="done" style="width: {{ pet.progress_percent }}%"></span>
+  </div>
+  <p class="muted xsmall">{{ pet.days_to_next }}일 더 연속으로 공부하면 {{ pet.next_stage_label | with_ro }} 자라요</p>
+  {% else %}
+  <p class="muted xsmall">최고 단계에 도달했어요! 연속 기록을 지켜 주세요.</p>
+  {% endif %}
+  {% if pet.stages %}
+  <ol class="pet-stages" aria-label="성장 단계">
+    {% for s in pet.stages %}
+    <li class="{% if s.current %}current{% elif s.reached %}reached{% endif %}" title="{{ s.label }} · {{ s.min_streak }}일 연속부터">
+      {% if s.image_url %}<img src="{{ s.image_url }}" alt="" width="36" height="36">{% else %}<span aria-hidden="true">{{ s.emoji }}</span>{% endif %}
+      <span class="xsmall">{{ s.label }}</span>
+    </li>
+    {% endfor %}
+  </ol>
+  {% endif %}
 </section>
 {% endif %}

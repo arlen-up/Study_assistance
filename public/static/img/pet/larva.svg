@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="애벌레">
+  <ellipse cx="100" cy="178" rx="70" ry="9" fill="#000" opacity=".08"/>
+  <path d="M14 168c30-30 120-42 172-14-40 22-132 26-172 14z" fill="#86efac"/>
+  <path d="M30 164c40-10 90-14 140-8" stroke="#4ade80" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g stroke="#16a34a" stroke-width="3">
+    <circle cx="44" cy="140" r="17" fill="#a3e635"/>
+    <circle cx="70" cy="132" r="19" fill="#84cc16"/>
+    <circle cx="98" cy="126" r="20" fill="#a3e635"/>
+    <circle cx="126" cy="118" r="21" fill="#84cc16"/>
+  </g>
+  <g fill="#facc15"><circle cx="70" cy="122" r="4"/><circle cx="98" cy="115" r="4"/><circle cx="126" cy="106" r="4"/></g>
+  <path d="M146 74q-6-22-18-28M164 74q8-22 22-24" stroke="#16a34a" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <circle cx="128" cy="46" r="6" fill="#f472b6"/><circle cx="186" cy="50" r="6" fill="#f472b6"/>
+  <circle cx="156" cy="98" r="30" fill="#bef264" stroke="#16a34a" stroke-width="3"/>
+  <circle cx="146" cy="94" r="5.5" fill="#27272a"/><circle cx="168" cy="94" r="5.5" fill="#27272a"/>
+  <circle cx="148" cy="92" r="1.8" fill="#fff"/><circle cx="170" cy="92" r="1.8" fill="#fff"/>
+  <ellipse cx="138" cy="106" rx="6" ry="3.5" fill="#fda4af" opacity=".8"/><ellipse cx="176" cy="106" rx="6" ry="3.5" fill="#fda4af" opacity=".8"/>
+  <path d="M150 108q7 7 14 0" stroke="#27272a" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g stroke="#16a34a" stroke-width="3" stroke-linecap="round"><path d="M40 156v8M66 150v8M94 145v8M122 138v8"/></g>
+</svg>
