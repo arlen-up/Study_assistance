@@ -112,4 +112,5 @@ templates.env.filters["with_ro"] = with_ro
 templates.env.filters["relative_days"] = relative_days
 templates.env.filters["category_label"] = lambda c: CATEGORY_LABELS.get(str(c), str(c))
 templates.env.globals["app_version"] = __version__
+templates.env.globals["app_tagline"] = "미루는 습관, 파편화된 학사 정보, 그리고 단기 기억에 머무는 학습 해결"
 templates.env.globals["build_month_calendars"] = build_month_calendars

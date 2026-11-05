@@ -1,4 +1,4 @@
-/* LMS 3분 학습 도우미 — 서비스 워커 (Web Push 수신)
+/* Study Overflow — 서비스 워커 (Web Push 수신)
  * 브라우저가 닫혀 있어도 푸시를 받아 알림을 띄운다.
  * 보안: 알림 클릭 시 이동 주소는 같은 사이트의 경로('/...')만 허용한다 (오픈 리다이렉트 방지).
  *
@@ -8,7 +8,7 @@
  * - 사파리(맥)는 푸시를 받으면 반드시 알림을 띄워야 한다 → 내용이 이상해도 기본 문구로 띄운다.
  */
 
-const DEFAULT_TITLE = "LMS 3분 학습 도우미";
+const DEFAULT_TITLE = "Study Overflow";
 const ICON = "/static/img/icon-192.png";
 const BADGE = "/static/img/badge-96.png";   // 안드로이드 상태 표시줄용 (흰색 실루엣)
 
