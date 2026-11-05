@@ -2,7 +2,8 @@
 
 처리 흐름
 0. 질문 분류(Router): 질문이 chat(일상 대화) / study(학습) / info(학적 정보) 중 무엇인지 AI가 고른다.
-   AI 분류가 실패하면 낱말 규칙으로 고르고, 화면의 단추로 직접 고를 수도 있다.
+   AI 분류가 실패하면 낱말 규칙으로 고른다. 학생이 종류를 고르는 단추는 없다
+   (답변 밑 '그림으로 정리'처럼 코드가 종류를 정해 보내는 단추만 분류를 건너뛴다).
 1. 종류별 답변
    - chat : 도구 없이 바로 대답한다. '근거 부족' 같은 표시를 붙이지 않는다.
    - study: 교안 도구(과목·주차로 찾기, 뜻으로 검색, 본문 읽기)로 근거를 모으고 [1], [2] 번호로 인용한다.
@@ -512,7 +513,7 @@ class AgentService:
             return round((time.perf_counter() - started) * 1000)
 
         if request.route:
-            return RouteInfo(type=request.route, reason="단추로 직접 골랐어요", method="button", plan=plan)
+            return RouteInfo(type=request.route, reason="답변 밑 단추로 요청했어요", method="button", plan=plan)
 
         recent = request.history[-2:]
         context = "\n".join(f"{'학생' if t.role == 'user' else '도우미'}: {t.content[:300]}" for t in recent)

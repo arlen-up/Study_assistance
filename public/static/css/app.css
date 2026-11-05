@@ -174,12 +174,6 @@ h1, h2, h3, h4 { margin: 0; }
 .chat-form { display: grid; gap: 8px; }
 .chat-options { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
 .chat-options .select { flex: 1; min-width: 200px; max-width: 360px; height: 34px; font-size: .82rem; }
-.route-pick { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
-.pill { position: relative; cursor: pointer; }
-.pill input { position: absolute; opacity: 0; pointer-events: none; }
-.pill span { display: inline-block; padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px; font-size: .78rem; font-weight: 600; color: var(--muted); background: #fff; }
-.pill input:checked + span { border-color: var(--primary); color: var(--primary); background: var(--accent-soft); }
-.pill input:focus-visible + span { outline: 3px solid var(--focus); }
 .chat-input-row { display: flex; gap: 8px; align-items: flex-end; }
 .chat-input-row .textarea { resize: none; min-height: 52px; }
 .chat-input-row .btn { height: 52px; }

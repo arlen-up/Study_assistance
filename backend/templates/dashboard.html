@@ -65,12 +65,6 @@
             hx-swap="beforeend scroll:#chat-log:bottom" hx-disabled-elt="find button[type=submit]">
         <input type="hidden" id="chat-history" name="history" value="[]">
         <div class="chat-options">
-          <div class="route-pick" role="radiogroup" aria-label="질문 종류">
-            <span class="muted xsmall">질문 종류</span>
-            {% for value, label, tip in [("", "🤖 자동", "AI가 질문 종류를 알아서 골라요"), ("chat", "💬 일상", "일상 대화로 답해요"), ("study", "📚 학습", "교안을 찾아 출처와 함께 답해요"), ("info", "🎓 학적", "학교 시스템에서 내 정보를 확인해요")] %}
-            <label class="pill" title="{{ tip }}"><input type="radio" name="route" value="{{ value }}"{% if not value %} checked{% endif %}><span>{{ label }}</span></label>
-            {% endfor %}
-          </div>
           {{ m.doc_select("chat-doc", documents, "", "전체 교안에서 찾기") }}
         </div>
         <div class="chat-input-row">

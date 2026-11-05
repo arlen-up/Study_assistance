@@ -241,7 +241,7 @@ async def ui_chat(
             document_id=_parse_uuid(document_id),
             history=turns,
             include_summary=include_summary is not None,
-            route=route if route in ROUTES else None,  # 비우면 AI가 질문 종류를 고른다
+            route=route if route in ROUTES else None,  # 입력창에서는 보내지 않음 → AI가 질문 종류를 고른다
         )
     except ValidationError:
         raise BadRequestError("질문을 1~2000자로 입력해 주세요.") from None
