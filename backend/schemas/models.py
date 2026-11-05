@@ -114,6 +114,7 @@ class ChatResponse(BaseModel):
     sources: list[SourceChunk]
     tool_calls: list[ToolCallTrace]
     lms_data: list[str] = Field(default_factory=list)  # 답변에 사용한 LMS 데이터 (예: "성적표")
+    intent: Literal["chat", "study", "info"] = "study"  # 질문 유형 (Router 결과)
 
 
 # ---------------------------------------------------------------------

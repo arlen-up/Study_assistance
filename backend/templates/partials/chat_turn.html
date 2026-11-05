@@ -11,9 +11,19 @@
       <p class="pre">{{ result.three_minute_summary }}</p>
     </div>
     {% endif %}
-    {% set label = confidence_labels[result.confidence] %}
     <div class="tags">
-      <span class="badge {{ label[1] }}">{{ label[0] }}</span>
+      {% if result.intent == "study" %}
+        {% if result.confidence == "low" %}
+          <span class="badge danger">[근거 부족]</span>
+        {% else %}
+          {% set label = confidence_labels[result.confidence] %}
+          <span class="badge {{ label[1] }}">{{ label[0] }}</span>
+        {% endif %}
+      {% elif result.intent == "info" %}
+        <span class="badge outline">🎓 학적 정보</span>
+      {% else %}
+        <span class="badge outline">💬 일상 대화</span>
+      {% endif %}
       {% for name in result.lms_data %}<span class="badge outline">🏫 LMS {{ name }}</span>{% endfor %}
     </div>
     {{ m.sources(result.sources) }}

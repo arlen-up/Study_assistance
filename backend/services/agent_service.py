@@ -33,6 +33,7 @@ from backend.integrations.lms_client import LmsClient
 from backend.schemas.career import CareerAdviceDraft, CareerAnalysis
 from backend.schemas.study_tools import FlashcardDeck, FlashcardDeckDraft, MindMap, MindMapDraft
 from backend.services import career_service, study_tools_service
+from backend.services.chat_router import Intent, classify_intent
 from backend.mcp_server import ToolDeps, bind_tool_deps, mcp
 from backend.schemas.models import (
     ChatDraft,
@@ -357,7 +358,12 @@ class AgentService:
         scope = f"\n(선택된 교안 document_id: {request.document_id})" if request.document_id else ""
         messages.append(HumanMessage(content=f"{request.message}{scope}"))
 
+        intent: Intent = classify_intent(request.message)
+
         async def ensure(tools: ToolMap, d: ToolDeps) -> None:
+            # 교안 검색은 학습 질문(study)에서만 한다. 일상 대화와 학적 조회는 교안을 검색하지 않는다.
+            if intent != "study":
+                return
             if not d.retrieved and "query_vector_db" in tools:
                 args: dict[str, Any] = {"query": request.message, "top_k": 5}
                 if request.document_id:
@@ -366,31 +372,50 @@ class AgentService:
 
         notes, traces = await self._run_tool_loop(messages, deps, ensure)
 
-        summary_rule = (
-            "three_minute_summary에 관련 내용을 3분 안에 읽을 분량(500~900자)으로 요약해."
-            if request.include_summary
-            else "three_minute_summary는 null로 둬."
-        )
-        draft = await self._structured(
-            ChatDraft,
-            task=(
+        if intent == "study":
+            summary_rule = (
+                "three_minute_summary에 관련 내용을 3분 안에 읽을 분량(500~900자)으로 요약해."
+                if request.include_summary
+                else "three_minute_summary는 null로 둬."
+            )
+            task = (
                 f"학생 질문: {request.message}\n"
                 f"근거 자료로 답하고, 자료가 부족하면 confidence를 low로 하고 솔직히 모른다고 답해. {summary_rule}"
-            ),
-            deps=deps,
-            agent_notes=notes,
-        )
+            )
+        elif intent == "info":
+            task = (
+                f"학생 질문: {request.message}\n"
+                "학적 도구(lms_*, career_analyze) 결과만 근거로 답해. 도구로 확인되지 않은 내용은 추측하지 마. "
+                "교안 근거나 '근거 부족' 문구는 쓰지 마. three_minute_summary는 null로 둬."
+            )
+        else:
+            task = (
+                f"학생 질문: {request.message}\n"
+                "일상 대화로 짧고 친근하게 답해. 교안이나 근거 자료는 언급하지 마. three_minute_summary는 null로 둬."
+            )
 
-        # LMS 데이터로 답한 경우, 인용하지 않은 교안 청크를 출처로 억지로 붙이지 않는다
-        sources = self._pick_sources(deps, draft.cited_chunk_ids, fallback_limit=0 if deps.lms_facts else 3)
-        has_evidence = bool(sources) or bool(deps.lms_facts)
+        draft = await self._structured(ChatDraft, task=task, deps=deps, agent_notes=notes)
+
+        if intent == "study":
+            # LMS 데이터로 답한 경우, 인용하지 않은 교안 청크를 출처로 억지로 붙이지 않는다
+            sources = self._pick_sources(deps, draft.cited_chunk_ids, fallback_limit=0 if deps.lms_facts else 3)
+            has_evidence = bool(sources) or bool(deps.lms_facts)
+            confidence = draft.confidence if has_evidence else "low"
+            summary = draft.three_minute_summary if request.include_summary else None
+        else:
+            # 일상 대화와 학적 조회는 교안 출처와 "[근거 부족]" 표시를 쓰지 않는다
+            sources = []
+            confidence = "high"
+            summary = None
+
         return ChatResponse(
             answer=draft.answer,
-            three_minute_summary=draft.three_minute_summary if request.include_summary else None,
-            confidence=draft.confidence if has_evidence else "low",
+            three_minute_summary=summary,
+            confidence=confidence,
             sources=sources,
             tool_calls=traces,
             lms_data=list(deps.lms_facts),
+            intent=intent,
         )
 
     async def summarize(self, document_id: UUID) -> SummaryResponse:
