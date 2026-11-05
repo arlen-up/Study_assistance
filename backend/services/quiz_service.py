@@ -120,7 +120,7 @@ async def record_study_log(
     *,
     user_id: UUID,
     document_id: UUID,
-    quiz_id: UUID,
+    quiz_id: UUID | None,
     score: int,
     total: int,
     duration_seconds: int | None,
@@ -133,7 +133,7 @@ async def record_study_log(
                 {
                     "user_id": str(user_id),
                     "document_id": str(document_id),
-                    "quiz_id": str(quiz_id),
+                    "quiz_id": str(quiz_id) if quiz_id else None,
                     "score": score,
                     "total_questions": total,
                     "completed": True,

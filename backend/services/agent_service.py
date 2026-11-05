@@ -31,7 +31,8 @@ from backend.core.config import Settings
 from backend.core.errors import NotFoundError, UpstreamError
 from backend.integrations.lms_client import LmsClient
 from backend.schemas.career import CareerAdviceDraft, CareerAnalysis
-from backend.services import career_service
+from backend.schemas.study_tools import FlashcardDeck, FlashcardDeckDraft, MindMap, MindMapDraft
+from backend.services import career_service, study_tools_service
 from backend.mcp_server import ToolDeps, bind_tool_deps, mcp
 from backend.schemas.models import (
     ChatDraft,
@@ -222,9 +223,7 @@ class AgentService:
                     )
                     messages.append(tool_message)
                     traces.append(
-                        ToolCallTrace(
-                            name=call["name"], arguments=call["args"], ok=tool_message.status != "error"
-                        )
+                        ToolCallTrace(name=call["name"], arguments=call["args"], ok=tool_message.status != "error")
                     )
             else:
                 logger.info("에이전트 최대 반복 횟수 도달")
@@ -480,7 +479,7 @@ class AgentService:
         track = analysis.track.title if analysis.track else "아직 정하지 않음"
         task = (
             f"학생({g.department})의 졸업 요건과 관심 직무({track}) 준비 상태를 보고 커리어 조언을 써.\n"
-            "- 숫자(학점·과목 수)는 <lms_data label=\"커리어 분석\">에 있는 값만 그대로 사용해. 직접 계산하지 마.\n"
+            '- 숫자(학점·과목 수)는 <lms_data label="커리어 분석">에 있는 값만 그대로 사용해. 직접 계산하지 마.\n'
             "- semester_plan은 candidates에 있는 course_code만 사용하고,"
             " 총 18학점 이내로 우선순위가 높은 것부터 골라.\n"
             "- 재수강·필수 과목이 있으면 먼저 넣고, 남는 자리에 직무 핵심 과목을 넣어.\n"
@@ -489,3 +488,72 @@ class AgentService:
         )
         return await self._structured(CareerAdviceDraft, task, deps)
 
+    # -----------------------------------------------------------------
+    # 노트북LM 참고 학습 도구
+    # -----------------------------------------------------------------
+    async def _prepare_document(
+        self, document_id: UUID, goal: str, search_hint: str
+    ) -> tuple[str, ToolDeps, list[ToolCallTrace], str]:
+        title = await self._get_document_title(document_id)
+        deps = self._new_deps()
+        messages: list[BaseMessage] = [
+            SystemMessage(content=_system_prompt()),
+            HumanMessage(
+                content=(
+                    f"교안 '{title}'(document_id: {document_id})으로 {goal}을(를) 만들 준비를 해.\n"
+                    "1) fetch_lms_document로 교안 전체를 읽고"
+                    " 2) 핵심 개념을 query_vector_db(document_id 지정)로 확인해."
+                )
+            ),
+        ]
+        notes, traces = await self._run_tool_loop(
+            messages, deps, self._ensure_document_and_search(document_id, f"{title} {search_hint}")
+        )
+        return title, deps, traces, notes
+
+    async def generate_flashcards(self, document_id: UUID) -> FlashcardDeck:
+        title, deps, traces, notes = await self._prepare_document(document_id, "플래시카드", "핵심 용어 정의")
+        draft = await self._structured(
+            FlashcardDeckDraft,
+            task=(
+                f"교안 '{title}'으로 IT 전공 학생용 플래시카드 8~10장을 만들어.\n"
+                "- 앞면: 짧은 질문이나 용어 (예: 'LIFO란?'), 뒷면: 1~2문장의 정확한 답\n"
+                "- 카드마다 서로 다른 개념을 다루고, 뒷면(답)이 다른 카드와 겹치지 않게 해\n"
+                "- 정의·특징·차이점·예시·활용처럼 다양한 각도로 묻기, 교안에 있는 내용만\n"
+                "- 각 카드에 근거 source_chunk_id 포함\n"
+                "- 쉬운 한국어로"
+            ),
+            deps=deps,
+            agent_notes=notes,
+        )
+        return FlashcardDeck(
+            document_id=document_id,
+            document_title=title,
+            cards=study_tools_service.build_cards(draft, deps.retrieved),
+            tool_calls=traces,
+        )
+
+    async def generate_mindmap(self, document_id: UUID) -> MindMap:
+        title, deps, traces, notes = await self._prepare_document(document_id, "마인드맵", "핵심 개념 구조")
+        draft = await self._structured(
+            MindMapDraft,
+            task=(
+                f"교안 '{title}'의 내용을 마인드맵으로 정리해.\n"
+                "- root: 교안의 중심 주제 (짧게)\n"
+                "- branches: 핵심 개념 3~6개, 각 branch의 children: 세부 개념 2~4개\n"
+                "- 모든 label은 짧은 명사구(15자 이내), 교안에 있는 내용만"
+            ),
+            deps=deps,
+            agent_notes=notes,
+        )
+        nodes, edges, width, height = study_tools_service.layout_mindmap(draft)
+        return MindMap(
+            document_id=document_id,
+            document_title=title,
+            root=draft.root,
+            nodes=nodes,
+            edges=edges,
+            width=width,
+            height=height,
+            tool_calls=traces,
+        )

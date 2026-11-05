@@ -8,7 +8,7 @@ from fastapi import UploadFile
 from supabase import AsyncClient
 
 from backend.core.config import Settings
-from backend.core.errors import BadRequestError, PayloadTooLargeError, UpstreamError
+from backend.core.errors import BadRequestError, NotFoundError, PayloadTooLargeError, UpstreamError
 from backend.schemas.models import (
     DashboardResponse,
     Difficulty,
@@ -39,6 +39,16 @@ async def list_documents(db: AsyncClient, limit: int = 30) -> list[DocumentItem]
         logger.exception("documents 조회 실패")
         raise UpstreamError("교안 목록을 불러오지 못했습니다.") from None
     return [DocumentItem.model_validate(row) for row in res.data]
+
+
+async def require_document(db: AsyncClient, document_id: UUID) -> None:
+    try:
+        res = await db.table("documents").select("id").eq("id", str(document_id)).limit(1).execute()
+    except Exception:
+        logger.exception("documents 확인 실패")
+        raise UpstreamError("교안 정보를 확인하지 못했습니다.") from None
+    if not res.data:
+        raise NotFoundError("교안을 찾을 수 없습니다.")
 
 
 async def get_pet_name(db: AsyncClient, user_id: UUID) -> str | None:

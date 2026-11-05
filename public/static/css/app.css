@@ -159,12 +159,16 @@ h1, h2, h3, h4 { margin: 0; }
 #tab-summary:checked ~ .tab-panels #panel-summary,
 #tab-quiz:checked ~ .tab-panels #panel-quiz,
 #tab-upload:checked ~ .tab-panels #panel-upload,
-#tab-career:checked ~ .tab-panels #panel-career { display: block; }
+#tab-career:checked ~ .tab-panels #panel-career,
+#tab-flashcards:checked ~ .tab-panels #panel-flashcards,
+#tab-mindmap:checked ~ .tab-panels #panel-mindmap { display: block; }
 #tab-chat:checked ~ .tab-nav label[for="tab-chat"],
 #tab-summary:checked ~ .tab-nav label[for="tab-summary"],
 #tab-quiz:checked ~ .tab-nav label[for="tab-quiz"],
 #tab-upload:checked ~ .tab-nav label[for="tab-upload"],
-#tab-career:checked ~ .tab-nav label[for="tab-career"] { background: var(--primary); color: var(--primary-text); }
+#tab-career:checked ~ .tab-nav label[for="tab-career"],
+#tab-flashcards:checked ~ .tab-nav label[for="tab-flashcards"],
+#tab-mindmap:checked ~ .tab-nav label[for="tab-mindmap"] { background: var(--primary); color: var(--primary-text); }
 .tab-radio:focus-visible ~ .tab-nav { outline: 3px solid rgba(5,150,105,.35); }
 
 /* ---------- 챗봇 ---------- */
@@ -278,3 +282,36 @@ h1, h2, h3, h4 { margin: 0; }
 @media (prefers-reduced-motion: reduce) { .pet-card.mood-happy .pet-emoji { animation: none; } }
 .push-actions { margin: 8px 0; }
 .sync-row { justify-content: space-between; margin-top: 8px; }
+
+/* ---------- 플래시카드 ---------- */
+.flash-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.flashcard { display: grid; gap: 8px; }
+.flip-toggle { position: absolute; opacity: 0; pointer-events: none; }
+.flash-inner { position: relative; display: block; height: 170px; cursor: pointer; transform-style: preserve-3d; transition: transform .45s ease; }
+.flip-toggle:checked + .flash-inner { transform: rotateY(180deg); }
+.flip-toggle:focus-visible + .flash-inner { outline: 3px solid rgba(5,150,105,.35); border-radius: var(--radius); }
+.flash-face { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; padding: 16px; border-radius: var(--radius); border: 1px solid var(--border); backface-visibility: hidden; -webkit-backface-visibility: hidden; text-align: center; }
+.flash-face.front { background: #fff; }
+.flash-face.back { background: var(--accent-soft); color: #064e3b; transform: rotateY(180deg); }
+.flash-no { position: absolute; top: 8px; left: 12px; font-size: .75rem; color: var(--muted); }
+.flash-text { font-weight: 700; font-size: .95rem; line-height: 1.45; }
+.flash-face.back .flash-text { font-weight: 500; font-size: .88rem; }
+.flash-hint, .flash-src { font-size: .75rem; color: var(--muted); }
+.flash-tip { position: absolute; bottom: 8px; font-size: .7rem; color: var(--muted); }
+.flash-rate { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.flash-rate .option { justify-content: center; padding: 6px 8px; font-size: .8rem; }
+@media (prefers-reduced-motion: reduce) { .flash-inner { transition: none; } }
+
+/* ---------- 마인드맵 ---------- */
+.mindmap-wrap { overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); background: #fafafa; max-height: 560px; }
+.mindmap { display: block; font-family: inherit; }
+.mm-edge { fill: none; stroke: #a7f3d0; stroke-width: 2.5; }
+.mm-edge.lv2 { stroke: #d4d4d8; stroke-width: 1.8; }
+.mm-node { cursor: pointer; outline: none; }
+.mm-node rect { fill: #fff; stroke: var(--border); stroke-width: 1.5; transition: fill .15s, stroke .15s; }
+.mm-node text { font-size: 13px; fill: var(--text); pointer-events: none; }
+.mm-node.lv0 rect { fill: var(--accent); stroke: var(--accent); }
+.mm-node.lv0 text { fill: #fff; font-weight: 800; font-size: 14px; }
+.mm-node.lv1 rect { fill: var(--accent-soft); stroke: #6ee7b7; }
+.mm-node.lv1 text { font-weight: 700; }
+.mm-node:hover rect, .mm-node:focus-visible rect { stroke: var(--accent); stroke-width: 2.5; }

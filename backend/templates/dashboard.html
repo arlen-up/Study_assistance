@@ -26,13 +26,15 @@
   <div class="layout">
     <section class="tabs">
       {# 라디오 버튼 + CSS로 만든 탭: JS 없이 전환되고, 탭을 바꿔도 내용이 유지된다 #}
-      {% for key, label in [("chat", "💬 챗봇"), ("summary", "⏱ 3분 요약"), ("quiz", "🧠 퀴즈"), ("career", "🧭 커리어"), ("upload", "📤 교안 등록")] %}
+      {% for key, label in [("chat", "💬 챗봇"), ("summary", "⏱ 3분 요약"), ("quiz", "🧠 퀴즈"), ("flashcards", "🃏 플래시카드"), ("mindmap", "🗺 마인드맵"), ("career", "🧭 커리어"), ("upload", "📤 교안 등록")] %}
       <input class="tab-radio" type="radio" name="tab" id="tab-{{ key }}"{% if active_tab == key %} checked{% endif %}>
       {% endfor %}
       <nav class="tab-nav" aria-label="학습 도구">
         <label for="tab-chat">💬 <span class="hide-sm">챗봇</span></label>
         <label for="tab-summary">⏱ <span class="hide-sm">3분 요약</span></label>
         <label for="tab-quiz">🧠 <span class="hide-sm">퀴즈</span></label>
+        <label for="tab-flashcards">🃏 <span class="hide-sm">카드</span></label>
+        <label for="tab-mindmap">🗺 <span class="hide-sm">마인드맵</span></label>
         <label for="tab-career">🧭 <span class="hide-sm">커리어</span></label>
         <label for="tab-upload">📤 <span class="hide-sm">교안 등록</span></label>
       </nav>
@@ -90,6 +92,32 @@
           </form>
           <p id="quiz-loading" class="htmx-indicator muted small"><span class="spinner"></span> 교안에서 키워드를 찾고 문제를 만드는 중…</p>
           <div id="quiz-area"></div>
+        </div>
+
+        {# ---------------- 플래시카드 ---------------- #}
+        <div class="tab-panel card" id="panel-flashcards">
+          <h2 class="card-title">🃏 플래시카드</h2>
+          <p class="muted small">AI가 교안의 핵심 용어로 카드를 만들어요. 카드를 눌러 뒤집고, 아는지 스스로 체크해요</p>
+          <form class="row" hx-post="/ui/flashcards" hx-target="#flashcards-area" hx-indicator="#flashcards-loading"
+                hx-disabled-elt="find button">
+            {{ m.doc_select("flashcards-doc", documents, "", "교안을 선택하세요") }}
+            <button type="submit" class="btn primary">카드 만들기</button>
+          </form>
+          <p id="flashcards-loading" class="htmx-indicator muted small"><span class="spinner"></span> 교안을 읽고 카드를 만드는 중…</p>
+          <div id="flashcards-area"></div>
+        </div>
+
+        {# ---------------- 마인드맵 ---------------- #}
+        <div class="tab-panel card" id="panel-mindmap">
+          <h2 class="card-title">🗺 마인드맵</h2>
+          <p class="muted small">교안을 한눈에 보는 개념 지도예요. 개념을 누르면 챗봇에 질문이 들어가요</p>
+          <form class="row" hx-post="/ui/mindmap" hx-target="#mindmap-area" hx-indicator="#mindmap-loading"
+                hx-disabled-elt="find button">
+            {{ m.doc_select("mindmap-doc", documents, "", "교안을 선택하세요") }}
+            <button type="submit" class="btn primary">마인드맵 그리기</button>
+          </form>
+          <p id="mindmap-loading" class="htmx-indicator muted small"><span class="spinner"></span> 교안 구조를 정리하는 중…</p>
+          <div id="mindmap-area"></div>
         </div>
 
         {# ---------------- 커리어 나비게이터 ---------------- #}

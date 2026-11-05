@@ -20,7 +20,7 @@ from backend.core.supabase_client import DbDep, SettingsDep
 from backend.integrations.lms_client import LmsClient, LmsDep
 from backend.routers.deps import WebAgentDep
 from backend.schemas.models import ChatRequest, ChatTurn, Difficulty, DocumentItem
-from backend.services import career_service, lms_link_service, study_service
+from backend.services import career_service, lms_link_service, study_service, study_tools_service
 from backend.web.session import (
     OptionalWebUser,
     WebUser,
@@ -39,7 +39,7 @@ router = APIRouter(include_in_schema=False)
 MAX_HISTORY = 10
 MAX_TURN_CHARS = 4000
 _history_adapter = TypeAdapter(list[ChatTurn])
-TABS = ("chat", "summary", "quiz", "career", "upload")
+TABS = ("chat", "summary", "quiz", "flashcards", "mindmap", "career", "upload")
 
 
 def _render(request: Request, name: str, context: dict[str, Any], status_code: int = 200) -> HTMLResponse:
@@ -384,3 +384,52 @@ async def ui_lms_sync(request: Request, user: WebUser, db: DbDep, settings: Sett
         message = f"최신 상태예요. 미제출 과제 {result.open_assignments}개, 이수 {result.completed_credits}학점."
     context = {**await _lms_context(db, lms, user.id), **await _career_context(db, user.id), "sync_message": message}
     return _render_lms_panel(request, context)
+
+
+# ---------------------------------------------------------------------
+# 노트북LM 참고 학습 도구 조각
+# ---------------------------------------------------------------------
+@router.post("/ui/flashcards", response_class=HTMLResponse)
+async def ui_flashcards(
+    request: Request, _user: WebUser, agent: WebAgentDep, document_id: Annotated[str, Form()] = ""
+) -> HTMLResponse:
+    doc_id = _parse_uuid(document_id)
+    if doc_id is None:
+        raise BadRequestError("플래시카드를 만들 교안을 선택해 주세요.")
+    deck = await agent.generate_flashcards(doc_id)
+    return _render(request, "partials/flashcards.html", {"deck": deck, "started_at": int(time.time())})
+
+
+@router.post("/ui/flashcards/submit", response_class=HTMLResponse)
+async def ui_flashcards_submit(request: Request, user: WebUser, db: DbDep) -> HTMLResponse:
+    form = await request.form()
+    doc_id = _parse_uuid(str(form.get("document_id", "")))
+    total = min(_safe_int(form.get("card_count")), 12)
+    if doc_id is None or total == 0:
+        raise BadRequestError("플래시카드 정보가 올바르지 않습니다.")
+    marks = [str(form.get(f"card_{i}", "")) for i in range(total)]
+    if any(m not in ("know", "again") for m in marks):
+        raise BadRequestError("모든 카드에 '알아요' 또는 '다시 볼래요'를 골라 주세요.")
+    known = marks.count("know")
+    again = [str(form.get(f"front_{i}", ""))[:80] for i, m in enumerate(marks) if m == "again"]
+    started_at = _safe_int(form.get("started_at"))
+    duration = max(0, min(int(time.time()) - started_at, 86_400)) if started_at else None
+
+    await study_service.require_document(db, doc_id)
+    await study_tools_service.record_flashcard_session(db, user.id, doc_id, known, total, duration)
+    dashboard = await study_service.get_dashboard(db, user.id)
+    return _render(
+        request,
+        "partials/flashcard_result.html",
+        {"known": known, "total": total, "again": again, "dashboard": dashboard, "oob": True},
+    )
+
+
+@router.post("/ui/mindmap", response_class=HTMLResponse)
+async def ui_mindmap(
+    request: Request, _user: WebUser, agent: WebAgentDep, document_id: Annotated[str, Form()] = ""
+) -> HTMLResponse:
+    doc_id = _parse_uuid(document_id)
+    if doc_id is None:
+        raise BadRequestError("마인드맵을 만들 교안을 선택해 주세요.")
+    return _render(request, "partials/mindmap.html", {"mindmap": await agent.generate_mindmap(doc_id)})

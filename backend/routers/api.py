@@ -15,6 +15,14 @@ from backend.core.supabase_client import DbDep, SettingsDep
 from backend.integrations.lms_client import LmsAssignment, LmsDep, LmsMaterialSummary, LmsSubmission, LmsTranscript
 from backend.routers.deps import ApiAgentDep
 from backend.schemas.career import CareerReport, CareerTargetRequest, CareerTrackItem
+from backend.schemas.study_tools import (
+    FlashcardDeck,
+    FlashcardRequest,
+    FlashcardResult,
+    FlashcardResultRequest,
+    MindMap,
+    MindMapRequest,
+)
 from backend.schemas.models import (
     ChatRequest,
     ChatResponse,
@@ -46,6 +54,7 @@ from backend.services import (
     review_service,
     streak_service,
     study_service,
+    study_tools_service,
 )
 
 ERROR_RESPONSES: dict[int | str, dict[str, object]] = {
@@ -270,3 +279,23 @@ async def cron_daily_reminders(
     if not authorization or not hmac.compare_digest(authorization.encode(), expected.encode()):
         raise UnauthorizedError("Cron 인증에 실패했습니다.")
     return await notification_service.run_daily(db, settings, lms)
+
+
+# ---------------- 노트북LM 참고 학습 도구 ----------------
+@router.post("/flashcards", response_model=FlashcardDeck, tags=["study-tools"])
+async def flashcards(body: FlashcardRequest, _user: CurrentUser, agent: ApiAgentDep) -> FlashcardDeck:
+    return await agent.generate_flashcards(body.document_id)
+
+
+@router.post("/flashcards/result", response_model=FlashcardResult, tags=["study-tools"])
+async def flashcards_result(body: FlashcardResultRequest, user: CurrentUser, db: DbDep) -> FlashcardResult:
+    await study_service.require_document(db, body.document_id)
+    log_id = await study_tools_service.record_flashcard_session(
+        db, user.id, body.document_id, body.known, body.total, body.duration_seconds
+    )
+    return FlashcardResult(known=body.known, total=body.total, study_log_id=log_id)
+
+
+@router.post("/mindmap", response_model=MindMap, tags=["study-tools"])
+async def mindmap(body: MindMapRequest, _user: CurrentUser, agent: ApiAgentDep) -> MindMap:
+    return await agent.generate_mindmap(body.document_id)
