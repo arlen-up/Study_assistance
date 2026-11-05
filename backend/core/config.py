@@ -4,6 +4,7 @@
 Vercel: 프로젝트 Environment Variables 를 읽는다.
 """
 
+import datetime as dt
 from functools import lru_cache
 
 from pydantic import Field, SecretStr, ValidationError, field_validator
@@ -67,6 +68,10 @@ class Settings(BaseSettings):
     cron_secret: SecretStr | None = None
 
     app_timezone: str = "Asia/Seoul"
+
+    # --- 학기 달력 ('저번주 자바 내용' 같은 질문의 주차 계산) ---
+    semester_label: str = "2026-2학기"
+    semester_start: dt.date = dt.date(2026, 8, 31)  # 1주차가 시작하는 월요일
 
     @field_validator(
         "lms_api_key", "lms_api_base_url", "moodle_base_url", "vapid_public_key", "vapid_private_key", "cron_secret",

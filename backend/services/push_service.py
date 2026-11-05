@@ -12,6 +12,7 @@ import asyncio
 import datetime as dt
 import json
 import logging
+import re
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
@@ -29,6 +30,10 @@ logger = logging.getLogger(__name__)
 PUSH_TTL_SECONDS = 6 * 3600
 PUSH_TIMEOUT_SECONDS = 10
 MAX_FAILURES = 5
+# 맥 사파리(Apple)·윈도우 엣지(WNS)·크롬(FCM) 모두 표준 Web Push 헤더를 따른다.
+# Urgency가 없으면 일부 서비스가 절전 중인 기기에 늦게 전달한다.
+PUSH_HEADERS = {"Urgency": "normal"}
+_SUBJECT = re.compile(r"^(mailto:[^@\s]+@[^@\s]+\.[^@\s]+|https://[^\s/]+\S*)$")
 
 
 class PushNotConfiguredError(AppError):
@@ -60,6 +65,40 @@ def is_allowed_endpoint(endpoint: str, settings: Settings) -> bool:
 def _require_push(settings: Settings) -> None:
     if not settings.push_enabled:
         raise PushNotConfiguredError("푸시 알림 키(VAPID)가 설정되지 않았습니다.")
+
+
+def vapid_subject(settings: Settings) -> str:
+    """VAPID 'sub'(연락처). Apple(맥 사파리)은 형식이 틀리면 403 BadJwtToken으로 거절한다.
+
+    'mailto: a@b.com'처럼 공백이 섞인 값은 고쳐 주고, 그래도 틀리면 설정 오류로 알린다.
+    """
+    subject = re.sub(r"^mailto:\s+", "mailto:", settings.vapid_subject.strip())
+    if not _SUBJECT.fullmatch(subject):
+        raise PushNotConfiguredError("VAPID_SUBJECT는 'mailto:주소' 또는 'https://주소' 형식이어야 합니다.")
+    return subject
+
+
+def subject_warning(settings: Settings) -> str | None:
+    """사파리 발송이 거절될 수 있는 연락처면 안내 문구 (예시 주소·localhost)."""
+    try:
+        subject = vapid_subject(settings)
+    except PushNotConfiguredError as exc:
+        return exc.message
+    host = subject.split("@", 1)[-1] if subject.startswith("mailto:") else urlparse(subject).hostname or ""
+    if host in {"example.com", "localhost"} or host.endswith((".example.com", ".local")):
+        return "VAPID_SUBJECT가 예시 주소예요. 맥 사파리 알림이 거절될 수 있으니 실제 연락처로 바꿔 주세요."
+    return None
+
+
+_subject_warned = False
+
+
+def _warn_subject_once(settings: Settings) -> None:
+    global _subject_warned
+    if not _subject_warned:
+        _subject_warned = True
+        if warning := subject_warning(settings):
+            logger.warning(warning)
 
 
 async def save_subscription(
@@ -119,8 +158,11 @@ def _send_one(settings: Settings, sub: dict[str, Any], payload: str) -> None:
         data=payload,
         vapid_private_key=settings.vapid_private_key.get_secret_value(),
         # pywebpush가 claims를 수정하므로 매번 새 dict를 넘긴다
-        vapid_claims={"sub": settings.vapid_subject, "aud": f"{parsed.scheme}://{parsed.netloc}"},
+        vapid_claims={"sub": vapid_subject(settings), "aud": f"{parsed.scheme}://{parsed.netloc}"},
+        # aes128gcm(RFC 8291)은 Apple·WNS·FCM이 모두 받는 유일한 공통 암호화 방식 (사파리는 이것만 받음)
+        content_encoding="aes128gcm",
         ttl=PUSH_TTL_SECONDS,
+        headers=dict(PUSH_HEADERS),
         timeout=PUSH_TIMEOUT_SECONDS,
     )
 
@@ -128,6 +170,8 @@ def _send_one(settings: Settings, sub: dict[str, Any], payload: str) -> None:
 async def send_to_user(db: AsyncClient, settings: Settings, user_id: UUID, payload: PushPayload) -> int:
     """사용자의 모든 구독(기기)으로 보낸다. 성공한 기기 수를 돌려준다."""
     _require_push(settings)
+    vapid_subject(settings)  # 형식이 틀리면 기기마다 실패하기 전에 한 번에 알린다
+    _warn_subject_once(settings)
     delivered = 0
     body = payload.to_json()
     for sub in await list_subscriptions(db, user_id):

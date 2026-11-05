@@ -1,4 +1,4 @@
-{# LMS 강의 자료 → 도우미 RAG 인덱스로 가져오기 (교안 등록 탭) #}
+{# 학교(코스모스) 강의 자료 → 도우미 검색 목록(RAG: 문서 검색 + 답변)으로 가져오기 (교안 등록 화면) #}
 <div id="lms-materials" class="lms-materials"{% if oob_materials %} hx-swap-oob="true"{% endif %}>
   <h3 class="small-title">📥 학교 강의 자료 가져오기</h3>
   {% if lms_status and lms_status.linked %}
@@ -12,6 +12,6 @@
     <p class="muted small">가져올 수 있는 강의 자료가 없어요.</p>
     {% endif %}
   {% else %}
-    <p class="muted small">‘🎓 내 학점·진로’ 탭에서 학교 계정을 연결하면 강의 자료를 바로 가져올 수 있어요.</p>
+    <p class="muted small">위쪽 ‘🎓 학점·진로’에서 학교 계정을 연결하면 강의 자료를 바로 가져올 수 있어요.</p>
   {% endif %}
 </div>

@@ -1,0 +1,38 @@
+/* 📲 알림 받기 카드 — 푸시 안내(맥/윈도우), 메일 미리보기, 카카오톡(예정)
+ * app.css의 색 변수(--border, --muted, --radius …)를 그대로 쓴다. */
+
+.push-card { display: grid; gap: 4px; }
+.push-card .push-actions { margin: 8px 0 4px; }
+
+/* '알림이 안 와요?' 안내 */
+.push-help { margin-top: 10px; border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px; background: #fafafa; }
+.push-help > summary { cursor: pointer; font-size: .85rem; font-weight: 600; }
+.push-help[open] > summary { margin-bottom: 8px; }
+.push-help > p { margin: 6px 0; }
+.push-os { margin-top: 8px; }
+.push-os ol { margin: 4px 0 0; padding-left: 18px; display: grid; gap: 4px; font-size: .8rem; line-height: 1.5; word-break: keep-all; }
+.push-os-title { font-size: .8rem; font-weight: 700; color: var(--text); }
+
+/* 다른 방법으로 받기 */
+.notify-channels { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); display: grid; gap: 6px; }
+.channel-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.channel-list li { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+.channel-list .channel-name { font-size: .88rem; font-weight: 600; }
+.channel-list .btn { margin-left: auto; }
+.channel-list li.is-disabled .channel-name { color: var(--muted); }
+
+/* 메일 미리보기 */
+.email-preview { margin-top: 8px; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; padding: 10px; display: grid; gap: 8px; }
+.email-preview-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.email-preview-close { margin-left: auto; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: .95rem; line-height: 1; padding: 4px; }
+.email-meta { margin: 0; display: grid; gap: 2px; font-size: .78rem; }
+.email-meta > div { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 6px; }
+.email-meta dt { color: var(--muted); }
+.email-meta dd { margin: 0; overflow-wrap: anywhere; }
+.email-frame { width: 100%; height: 460px; border: 1px solid var(--border); border-radius: 8px; background: #f6f7f9; }
+.email-text > summary { cursor: pointer; color: var(--muted); }
+.email-text pre { margin: 6px 0 0; padding: 10px; background: #fafafa; border-radius: 8px; font-size: .75rem; white-space: pre-wrap; word-break: break-word; max-height: 240px; overflow: auto; }
+
+@media (max-width: 640px) {
+  .email-frame { height: 400px; }
+}

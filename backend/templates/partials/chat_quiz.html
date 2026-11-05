@@ -1,0 +1,11 @@
+{# 챗봇 안의 '🧠 퀴즈·카드' 단추 결과 — 퀴즈를 카드로 풀고, 채점 뒤에는 카드를 뒤집어 정답·해설을 본다 #}
+<div class="bubble-row user"><div class="bubble user">🧠 ‘{{ quiz.document_title }}’ 퀴즈·카드 풀래요</div></div>
+<div class="bubble-row bot">
+  <article class="bubble bot wide" aria-label="퀴즈·카드">
+    <div class="bubble-meta">
+      <span class="badge route route-study">🧠 퀴즈·카드</span>
+      {% if answer_ms %}<span class="muted xsmall">{{ answer_ms | seconds }}</span>{% endif %}
+    </div>
+    {% include "partials/quiz_form.html" %}
+  </article>
+</div>

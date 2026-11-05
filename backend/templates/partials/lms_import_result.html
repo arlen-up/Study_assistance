@@ -4,15 +4,11 @@
     <p class="review-title">{{ result.title }}</p>
     <p class="muted xsmall">
       {% if result.already_imported %}이미 가져온 자료예요{% else %}{{ result.chunk_count }}개 청크로 저장 완료{% endif %}
-      · 챗봇·요약·퀴즈에서 바로 쓸 수 있어요
+      · 챗봇에서 바로 물어볼 수 있어요
     </p>
   </div>
   <span class="badge success">가져옴</span>
 </li>
 
-{# out-of-band: 세 탭의 교안 선택 목록 갱신 #}
-{{ m.doc_select("chat-doc", documents, "", "전체 교안에서 검색", oob=true) }}
-{{ m.doc_select("summary-doc", documents, "", "교안을 선택하세요", oob=true) }}
-{{ m.doc_select("quiz-doc", documents, "", "오늘의 교안 (가장 최근)", oob=true) }}
-{{ m.doc_select("flashcards-doc", documents, "", "교안을 선택하세요", oob=true) }}
-{{ m.doc_select("mindmap-doc", documents, "", "교안을 선택하세요", oob=true) }}
+{# out-of-band: 챗봇의 교안 선택 목록 갱신 #}
+{{ m.doc_select("chat-doc", documents, "", "전체 교안에서 찾기", oob=true) }}

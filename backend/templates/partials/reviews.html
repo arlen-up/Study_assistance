@@ -5,7 +5,7 @@
   <p class="muted small">1일 → 3일 → 7일 간격으로 복습하면 오래 기억해요</p>
 
   {% if not (r.due or r.upcoming or r.mastered) %}
-  <p class="muted small">아직 학습 기록이 없어요. 퀴즈를 풀면 복습 일정이 생겨요.</p>
+  <p class="muted small">아직 학습 기록이 없어요. 챗봇에서 퀴즈·카드를 풀면 복습 일정이 생겨요.</p>
   {% endif %}
 
   {% if r.due %}
@@ -17,7 +17,9 @@
         <p class="review-title">{{ item.document_title }}</p>
         <p class="muted xsmall">{{ item.review_count }}회 학습 · 마지막 {{ item.last_studied_at | kst }}</p>
       </div>
-      <a class="btn primary sm" href="/?tab=quiz&amp;quiz_doc={{ item.document_id }}">퀴즈로 복습</a>
+      <button type="button" class="btn primary sm" hx-post="/ui/chat/quiz" hx-vals='{"document_id": "{{ item.document_id }}"}'
+              hx-target="#chat-log" hx-swap="beforeend scroll:#chat-log:bottom" data-goto-view="chat"
+              data-chat-action="퀴즈·카드를 만드는 중…">퀴즈·카드로 복습</button>
     </li>
     {% endfor %}
   </ul>

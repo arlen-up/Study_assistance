@@ -1,6 +1,7 @@
 """Jinja2 템플릿 설정과 화면용 헬퍼 (날짜 포맷, 월별 잔디 달력 계산)."""
 
 import datetime as dt
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -10,6 +11,7 @@ from backend import __version__
 from backend.integrations.lms_client import CATEGORY_LABELS
 from backend.schemas.models import HeatmapDay
 from backend.services.pet_service import with_ro
+from backend.web.markdown import render_markdown
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 KST = dt.timezone(dt.timedelta(hours=9), name="KST")  # 한국은 서머타임이 없어 고정 오프셋으로 충분
@@ -91,7 +93,21 @@ def build_month_calendars(days: list[HeatmapDay]) -> list[MonthCalendar]:
     return months
 
 
+def pretty_json(value: object) -> str:
+    """도구 입력을 사람이 읽기 좋게 (한글 그대로, 들여쓰기). 화면에서는 자동 이스케이프된다."""
+    return json.dumps(value, ensure_ascii=False, indent=2, default=str)
+
+
+def seconds(ms: int | None) -> str:
+    if not ms:
+        return ""
+    return f"{ms / 1000:.1f}초" if ms >= 1000 else f"{ms}ms"
+
+
 templates.env.filters["kst"] = kst_datetime
+templates.env.filters["markdown"] = render_markdown
+templates.env.filters["pretty_json"] = pretty_json
+templates.env.filters["seconds"] = seconds
 templates.env.filters["with_ro"] = with_ro
 templates.env.filters["relative_days"] = relative_days
 templates.env.filters["category_label"] = lambda c: CATEGORY_LABELS.get(str(c), str(c))

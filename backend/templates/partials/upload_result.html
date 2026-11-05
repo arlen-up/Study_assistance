@@ -1,12 +1,11 @@
 {% import "partials/_macros.html" as m %}
 <div class="alert info" role="status">
-  ‘{{ result.title }}’ 등록 완료 · {{ result.chunk_count }}개 청크로 나눠 저장했어요.
+  ‘{{ result.title }}’ 등록 완료 · 검색용 조각 {{ result.chunk_count }}개로 나눠 저장했어요.
+  {% if result.original_saved %}PDF 원본도 보관해서 챗봇 출처에서 해당 쪽을 바로 볼 수 있어요.{% endif %}
+  <button type="button" class="btn outline sm" hx-get="/ui/viewer/{{ result.document_id }}" hx-target="#doc-viewer"
+          hx-swap="innerHTML" data-goto-view="chat" data-open-viewer>챗봇 옆에 열기</button>
 </div>
 
-{# out-of-band: 빈 업로드 폼으로 교체 + 세 탭의 교안 선택 목록 갱신 #}
+{# out-of-band: 빈 업로드 폼으로 교체 + 챗봇의 교안 선택 목록 갱신 #}
 {% include "partials/upload_form.html" %}
-{{ m.doc_select("chat-doc", documents, "", "전체 교안에서 검색", oob=true) }}
-{{ m.doc_select("summary-doc", documents, "", "교안을 선택하세요", oob=true) }}
-{{ m.doc_select("quiz-doc", documents, "", "오늘의 교안 (가장 최근)", oob=true) }}
-{{ m.doc_select("flashcards-doc", documents, "", "교안을 선택하세요", oob=true) }}
-{{ m.doc_select("mindmap-doc", documents, "", "교안을 선택하세요", oob=true) }}
+{{ m.doc_select("chat-doc", documents, "", "전체 교안에서 찾기", oob=true) }}

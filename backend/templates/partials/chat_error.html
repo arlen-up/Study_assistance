@@ -1,4 +1,11 @@
-<div class="alert danger" role="alert">{{ message }}</div>
-{# 실패한 질문을 입력창에 되돌려 다시 보낼 수 있게 함 #}
+{# 실패하면 오류 말풍선을 보여 주고, 보낸 질문을 입력창에 되돌려 다시 보낼 수 있게 한다 #}
+<div class="bubble-row bot">
+  <div class="bubble bot error" role="alert">
+    <p>⚠️ {{ message }}</p>
+    {% if draft %}<p class="muted xsmall">보낸 질문을 입력창에 다시 넣어 두었어요.</p>{% endif %}
+  </div>
+</div>
+{% if draft %}
 <textarea id="chat-input" name="message" class="textarea" rows="2" maxlength="2000" required
-          placeholder="궁금한 내용을 입력하세요" hx-swap-oob="true">{{ draft }}</textarea>
+          placeholder="무엇이든 물어보세요 (Enter 보내기 · Shift+Enter 줄바꿈)" hx-swap-oob="true">{{ draft }}</textarea>
+{% endif %}

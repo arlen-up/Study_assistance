@@ -38,7 +38,7 @@ class HealthResponse(BaseModel):
 
 
 class SourceChunk(BaseModel):
-    """RAG 답변의 출처(교안 청크)."""
+    """RAG(문서 검색 + 답변)의 출처 = 교안 조각(청크)."""
 
     chunk_id: UUID
     document_id: UUID
@@ -47,14 +47,18 @@ class SourceChunk(BaseModel):
     page_number: int | None = None
     similarity: float
     content: str
+    location: str | None = None  # 사람이 읽는 위치: "p.3" / "§ 2. 큐(Queue)" / "1번째 단락"
+    ref: int | None = None       # 답변 속 인용 번호 [1], [2] …
 
 
 class ToolCallTrace(BaseModel):
-    """에이전트가 호출한 MCP 도구 기록 (디버깅·데모용)."""
+    """에이전트가 호출한 MCP 도구 기록 — 화면에서 눌러 입력/출력을 볼 수 있다."""
 
     name: str
     arguments: dict[str, Any]
     ok: bool
+    output: str | None = None       # 도구 결과 (길면 잘라서 보관)
+    duration_ms: int | None = None
 
 
 # ---------------------------------------------------------------------
@@ -79,6 +83,7 @@ class DocumentIngestResponse(BaseModel):
     chunk_count: int
     char_count: int
     already_imported: bool = False  # LMS 자료를 이미 가져온 경우 True (중복 저장 안 함)
+    original_saved: bool = False    # PDF 원본을 뷰어용으로 보관했는지
 
 
 # ---------------------------------------------------------------------
@@ -89,31 +94,74 @@ class ChatTurn(RequestModel):
     content: str = Field(min_length=1, max_length=4000)
 
 
+RouteType = Literal["chat", "study", "info"]
+Evidence = Literal["high", "medium", "low"]
+
+
 class ChatRequest(RequestModel):
     message: str = Field(min_length=1, max_length=2000)
     document_id: UUID | None = None
     history: list[ChatTurn] = Field(default_factory=list, max_length=10)
     include_summary: bool = False
+    route: RouteType | None = Field(default=None, description="비우면 AI가 질문 종류를 판단 (chat/study/info)")
 
 
-class ChatDraft(BaseModel):
-    """LLM 구조화 출력: 챗봇 답변."""
+class RouteDecision(BaseModel):
+    """LLM 구조화 출력: 질문 분류기(Router)."""
 
-    answer: str = Field(description="학생 질문에 대한 한국어 답변. 근거 자료에 없는 내용은 지어내지 말 것.")
-    three_minute_summary: str | None = Field(
-        default=None, description="요청된 경우에만: 3분 안에 읽을 수 있는 핵심 요약(500~900자)."
-    )
-    confidence: Literal["high", "medium", "low"] = Field(description="근거 자료로 답변이 뒷받침되는 정도.")
-    cited_chunk_ids: list[str] = Field(default_factory=list, description="답변 근거로 사용한 chunk_id 목록.")
+    type: RouteType = Field(description="chat(일상 대화) / study(학습 질문) / info(학적 정보 조회)")
+    reason: str = Field(description="그렇게 분류한 이유 (한국어, 20자 이내)")
+    course: str | None = Field(default=None, description="질문에 나온 과목 이름이나 별칭 (예: 자바). 없으면 null")
+    week_no: int | None = Field(default=None, ge=1, le=16, description="질문이 가리키는 수업 주차 번호. 없으면 null")
+
+
+class RouteInfo(BaseModel):
+    """질문 분류기(Router) 결과 — chat(일상) / study(학습) / info(학적 정보)."""
+
+    type: RouteType
+    reason: str
+    method: Literal["llm", "rule", "button"]   # AI가 분류 / 규칙으로 분류(AI 실패 시) / 단추로 지정
+    duration_ms: int = 0
+    plan: dict[str, Any] = Field(default_factory=dict)
+
+
+class LmsSource(BaseModel):
+    """학적 정보(info) 답변의 출처 — 어느 학교 시스템의 어떤 데이터를 봤는지."""
+
+    system: str        # 예: "가상 코스모스", "가상 학사정보"
+    label: str         # 예: "미제출 과제 목록"
+    fetched_at: dt.datetime
+
+
+class Citation(BaseModel):
+    """답변 밑에 붙는 출처 한 줄 — 답변 속 [1], [2] 번호와 짝을 이룬다."""
+
+    ref: int
+    kind: Literal["chunk", "document"]   # 교안 조각 / 교안 전체(과목·주차로 찾은 자료)
+    title: str
+    location: str | None = None          # "p.3" / "§ 2. 큐(Queue)" / "본문 2번째 부분"
+    snippet: str | None = None
+    document_id: UUID | None = None
+    chunk_id: UUID | None = None
+    page_number: int | None = None
+    similarity: float | None = None
+    cited: bool = True                   # 답변 속에서 실제로 [번호]로 인용했는지
 
 
 class ChatResponse(BaseModel):
-    answer: str
+    answer: str                                   # 마크다운
     three_minute_summary: str | None = None
-    confidence: Literal["high", "medium", "low"]
-    sources: list[SourceChunk]
-    tool_calls: list[ToolCallTrace]
+    route: RouteInfo | None = None
+    evidence: Evidence | None = None              # 학습 질문(study)에서만 '근거 충분/부족'을 표시
+    confidence: Evidence = "high"                 # (이전 API 호환) evidence와 같은 값, 없으면 high
+    citations: list[Citation] = Field(default_factory=list)
+    sources: list[SourceChunk] = Field(default_factory=list)
+    lms_sources: list[LmsSource] = Field(default_factory=list)
+    tool_calls: list[ToolCallTrace] = Field(default_factory=list)
     lms_data: list[str] = Field(default_factory=list)  # 답변에 사용한 LMS 데이터 (예: "성적표")
+    context_document_id: UUID | None = None       # 다음 단추(요약·퀴즈·그림 정리)에 쓸 교안
+    context_document_title: str | None = None
+    answer_ms: int = 0                            # 답변 작성에 걸린 시간 (질문 분류 포함)
 
 
 # ---------------------------------------------------------------------
@@ -139,6 +187,7 @@ class SummaryResponse(BaseModel):
     key_points: list[str]
     keywords: list[str]
     sources: list[SourceChunk]
+    citations: list["Citation"] = Field(default_factory=list)
     tool_calls: list[ToolCallTrace]
 
 

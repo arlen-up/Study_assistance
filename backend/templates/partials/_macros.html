@@ -14,32 +14,158 @@
 </select>
 {%- endmacro %}
 
+{# ---------- 질문 종류 (Router) ---------- #}
+{% set route_labels = {"chat": ("💬", "일상 대화"), "study": ("📚", "학습 질문"), "info": ("🎓", "학적 정보")} %}
+{% set route_methods = {"llm": "AI가 분류", "rule": "규칙으로 분류", "button": "직접 선택"} %}
+
+{% macro route_badge(route) -%}
+{% if route %}
+{% set label = route_labels[route.type] %}
+<span class="badge route route-{{ route.type }}" title="{{ route.reason }}">{{ label[0] }} {{ label[1] }}<span class="route-how"> · {{ route_methods[route.method] }}</span></span>
+{% endif %}
+{%- endmacro %}
+
+{# ---------- 근거 수준: 학습 질문(study)에만 붙인다 ---------- #}
+{% set evidence_labels = {"high": ("근거 충분", "success", "교안이 답을 충분히 뒷받침해요"),
+                          "medium": ("근거 일부", "warning", "교안에 일부만 나와 있어요"),
+                          "low": ("근거 부족", "danger", "교안에서 찾지 못한 내용이 있어요")} %}
+
+{% macro evidence_badge(evidence) -%}
+{% if evidence %}
+{% set e = evidence_labels[evidence] %}
+<span class="badge {{ e[1] }}" title="{{ e[2] }}">{{ e[0] }}</span>
+{% endif %}
+{%- endmacro %}
+
+{# ---------- 출처: 교안 (번호 [n]과 짝) ---------- #}
+{% macro viewer_url(c) -%}
+/ui/viewer/{{ c.document_id }}{% if c.chunk_id or c.page_number %}?{% if c.chunk_id %}chunk={{ c.chunk_id }}{% endif %}{% if c.chunk_id and c.page_number %}&amp;{% endif %}{% if c.page_number %}page={{ c.page_number }}{% endif %}{% endif %}
+{%- endmacro %}
+
+{% macro citations(items, turn_id, empty_note=none) -%}
+<div class="sources">
+  {% if items %}
+  <p class="sources-title">📎 출처{% if not items[0].cited %} <span class="muted">· 답변에 쓴 교안</span>{% endif %}</p>
+  <ol class="cite-list">
+    {% for c in items %}
+    <li class="cite-item" id="cite-{{ turn_id }}-{{ c.ref }}">
+      <span class="cite-no" aria-hidden="true">{{ c.ref if c.cited else "·" }}</span>
+      <div class="cite-body">
+        <p class="cite-title">{{ c.title }}</p>
+        <p class="cite-where">
+          {%- if c.location %}📍 {{ c.location }}{% endif %}
+          {%- if c.similarity is not none %} · 관련도 {{ (c.similarity * 100) | round | int }}%{% endif %}
+        </p>
+        {% if not c.document_id and c.snippet %}
+        <details class="cite-snippet"><summary>내용 미리보기</summary><p class="pre">{{ c.snippet }}</p></details>
+        {% endif %}
+      </div>
+      {% if c.document_id %}
+      <button type="button" class="btn outline xs" hx-get="{{ viewer_url(c) }}" hx-target="#doc-viewer"
+              hx-swap="innerHTML" data-open-viewer>교안 보기</button>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+  {% elif empty_note %}
+  <p class="source-note">{{ empty_note }}</p>
+  {% endif %}
+</div>
+{%- endmacro %}
+
+{# 3분 요약·퀴즈처럼 청크(SourceChunk)만 있는 결과용 #}
 {% macro sources(items) -%}
 {% if items %}
 <div class="sources">
-  <p class="sources-title">출처</p>
-  {% for s in items %}
-  <details class="source">
-    <summary>
-      <span class="source-title">📄 {{ s.document_title }}</span>
-      {% if s.page_number %}<span class="muted">p.{{ s.page_number }}</span>{% endif %}
-      <span class="muted source-sim">{{ (s.similarity * 100) | round | int }}%</span>
-    </summary>
-    <p class="source-body">{{ s.content }}</p>
-  </details>
-  {% endfor %}
+  <p class="sources-title">📎 출처</p>
+  <ol class="cite-list">
+    {% for s in items %}
+    <li class="cite-item">
+      <span class="cite-no" aria-hidden="true">{{ loop.index }}</span>
+      <div class="cite-body">
+        <p class="cite-title">{{ s.document_title }}</p>
+        <p class="cite-where">{% if s.location %}📍 {{ s.location }} · {% elif s.page_number %}📍 p.{{ s.page_number }} · {% endif %}관련도 {{ (s.similarity * 100) | round | int }}%</p>
+      </div>
+      <button type="button" class="btn outline xs" hx-target="#doc-viewer" hx-swap="innerHTML" data-open-viewer
+              hx-get="/ui/viewer/{{ s.document_id }}?chunk={{ s.chunk_id }}{% if s.page_number %}&amp;page={{ s.page_number }}{% endif %}">교안 보기</button>
+    </li>
+    {% endfor %}
+  </ol>
 </div>
 {% endif %}
 {%- endmacro %}
 
-{% macro tool_badges(calls) -%}
+{# ---------- 출처: 학교 시스템 (학적 정보 답변) ---------- #}
+{% macro lms_sources(items) -%}
+<div class="sources">
+  <p class="sources-title">📎 출처</p>
+  {% if items %}
+  <ul class="cite-list">
+    {% for s in items %}
+    <li class="cite-item">
+      <span class="cite-no" aria-hidden="true">🏫</span>
+      <div class="cite-body">
+        <p class="cite-title">{{ s.system }} · {{ s.label }}</p>
+        <p class="cite-where">{{ s.fetched_at | kst }} 기준으로 조회</p>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="source-note">학교 시스템 데이터를 아직 확인하지 못했어요.</p>
+  {% endif %}
+</div>
+{%- endmacro %}
+
+{# ---------- MCP 도구 호출: 눌러서 입력/출력 보기 ---------- #}
+{% macro tool_calls(calls) -%}
 {% if calls %}
-<div class="tool-badges" aria-label="AI가 사용한 MCP 도구">
-  {% for c in calls %}
-  <span class="badge {{ 'secondary' if c.ok else 'danger' }}" title="{{ c.arguments | tojson }}">🔧 {{ c.name }}</span>
-  {% endfor %}
+<details class="tool-log">
+  <summary>🔧 사용한 MCP 도구 {{ calls | length }}개 <span class="muted">· 눌러서 입력/출력 보기</span></summary>
+  <ol class="tool-list">
+    {% for c in calls %}
+    <li>
+      <details class="tool-call{{ '' if c.ok else ' failed' }}">
+        <summary>
+          <span class="tool-name">{{ '✅' if c.ok else '⚠️' }} {{ c.name }}</span>
+          {% if c.duration_ms is not none %}<span class="muted xsmall">{{ c.duration_ms | seconds }}</span>{% endif %}
+        </summary>
+        <p class="tool-label">입력 (input)</p>
+        <pre class="tool-io">{{ c.arguments | pretty_json }}</pre>
+        <p class="tool-label">출력 (output)</p>
+        <pre class="tool-io">{{ c.output or "(출력 없음)" }}</pre>
+      </details>
+    </li>
+    {% endfor %}
+  </ol>
+</details>
+{% endif %}
+{%- endmacro %}
+{# 예전 화면 호환용 이름 #}
+{% macro tool_badges(calls) -%}{{ tool_calls(calls) }}{%- endmacro %}
+
+{# ---------- 답변 아래 이어서 하기 단추 ---------- #}
+{% macro followups(document_id, title, skip=none) -%}
+{% if document_id %}
+<div class="followups" role="group" aria-label="이 교안으로 이어서 하기">
+  <p class="followups-title">📘 {{ title or "이 교안" }}(으)로 이어서</p>
+  <div class="chips">
+    {% if skip != "summary" %}
+    <button type="button" class="chip" hx-post="/ui/chat/summary" hx-vals='{"document_id": "{{ document_id }}"}'
+            hx-target="#chat-log" hx-swap="beforeend scroll:#chat-log:bottom" data-chat-action="3분 요약을 만드는 중…">⏱ 3분 요약</button>
+    {% endif %}
+    {% if skip != "quiz" %}
+    <button type="button" class="chip" hx-post="/ui/chat/quiz" hx-vals='{"document_id": "{{ document_id }}"}'
+            hx-target="#chat-log" hx-swap="beforeend scroll:#chat-log:bottom" data-chat-action="퀴즈·카드를 만드는 중…">🧠 퀴즈·카드</button>
+    {% endif %}
+    <button type="button" class="chip" hx-post="/ui/chat" hx-include="#chat-history"
+            hx-vals='{"message": "이 교안의 핵심 개념을 마인드맵 그림으로 정리해줘", "route": "study", "document_id": "{{ document_id }}"}'
+            hx-target="#chat-log" hx-swap="beforeend scroll:#chat-log:bottom" data-chat-action="그림으로 정리하는 중…">🗺 그림으로 정리</button>
+    <button type="button" class="chip" hx-get="/ui/viewer/{{ document_id }}" hx-target="#doc-viewer" hx-swap="innerHTML"
+            data-open-viewer>📄 교안 보기</button>
+  </div>
 </div>
 {% endif %}
 {%- endmacro %}
 
-{% set type_labels = {"multiple_choice": "객관식", "ox": "O/X", "code_blank": "코드 빈칸"} %}
+{% set type_labels = {"multiple_choice": "객관식", "ox": "O/X", "code_blank": "빈칸"} %}

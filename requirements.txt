@@ -25,6 +25,7 @@ supabase==2.34.0
 # --- Utils ---
 httpx==0.28.1              # 도우미 → 가상 LMS API 호출 (LMS 클라이언트)
 pypdf==6.21.4              # PDF 교안 텍스트 추출
+markdown-it-py==4.2.0      # AI 답변 마크다운 → 안전한 HTML (HTML 태그 차단, 그림·인용 처리)
 
 # --- Web Push 알림 ---
 pywebpush==2.5.0           # VAPID 서명 + 푸시 메시지 암호화 (py-vapid, http-ece 포함)
