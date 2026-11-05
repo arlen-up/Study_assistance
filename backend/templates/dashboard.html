@@ -18,6 +18,7 @@
 
   {% if dashboard %}
     {% include "partials/due_banner.html" %}
+    {% include "partials/pet_card.html" %}
     {% include "partials/stats.html" %}
     {% include "partials/heatmap.html" %}
   {% endif %}
@@ -113,6 +114,7 @@
 
     <aside class="stack">
       {% include "partials/lms_panel.html" %}
+      {% include "partials/push_card.html" %}
       {% if dashboard %}{% include "partials/reviews.html" %}{% endif %}
     </aside>
   </div>

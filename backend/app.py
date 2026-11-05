@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import RequestResponseEndpoint
 
@@ -127,6 +127,25 @@ def create_app() -> FastAPI:
     @app.get("/favicon.ico", include_in_schema=False)
     async def favicon() -> Response:
         return Response(status_code=204)
+
+    # 서비스 워커는 사이트 루트(/sw.js)에 있어야 전체 경로를 관리할 수 있다. (Vercel에서는 CDN이 public/ 에서 제공)
+    @app.get("/sw.js", include_in_schema=False)
+    async def service_worker() -> Response:
+        path = ROOT / "public" / "sw.js"
+        if not path.is_file():
+            return Response(status_code=404)
+        return FileResponse(
+            path,
+            media_type="application/javascript",
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Service-Worker-Allowed": "/"},
+        )
+
+    @app.get("/manifest.webmanifest", include_in_schema=False)
+    async def manifest() -> Response:
+        path = ROOT / "public" / "manifest.webmanifest"
+        if not path.is_file():
+            return Response(status_code=404)
+        return FileResponse(path, media_type="application/manifest+json")
 
     return app
 

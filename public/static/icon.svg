@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="LMS 3분 학습 도우미">
+  <rect width="512" height="512" rx="112" fill="#059669"/>
+  <path d="M136 152c48-20 96-20 120 8v224c-24-24-72-28-120-8z" fill="#ecfdf5"/>
+  <path d="M376 152c-48-20-96-20-120 8v224c24-24 72-28 120-8z" fill="#d1fae5"/>
+  <circle cx="376" cy="132" r="44" fill="#fbbf24"/>
+  <text x="376" y="148" font-family="Arial, sans-serif" font-size="44" font-weight="700" text-anchor="middle" fill="#064e3b">3</text>
+</svg>

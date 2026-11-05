@@ -53,9 +53,25 @@ class Settings(BaseSettings):
     moodle_base_url: str | None = None   # 코스모스(Moodle) 주소. 없으면 가상 코스모스
     lms_timeout_seconds: float = Field(default=10.0, gt=0, le=30)
 
+    # --- Web Push 알림 ---
+    vapid_public_key: str | None = None
+    vapid_private_key: SecretStr | None = None
+    vapid_subject: str = "mailto:you@example.com"
+    # 구독 endpoint로 서버가 요청을 보내므로(SSRF 위험) 알려진 푸시 서비스 호스트만 허용 (접미사 일치)
+    push_allowed_hosts: str = (
+        "fcm.googleapis.com,updates.push.services.mozilla.com,push.services.mozilla.com,"
+        "web.push.apple.com,notify.windows.com"
+    )
+
+    # --- 매일 알림 (Vercel Cron) ---
+    cron_secret: SecretStr | None = None
+
     app_timezone: str = "Asia/Seoul"
 
-    @field_validator("lms_api_key", "lms_api_base_url", "moodle_base_url", mode="before")
+    @field_validator(
+        "lms_api_key", "lms_api_base_url", "moodle_base_url", "vapid_public_key", "vapid_private_key", "cron_secret",
+        mode="before",
+    )
     @classmethod
     def _blank_optional(cls, value: object) -> object:
         return None if isinstance(value, str) and not value.strip() else value
@@ -104,6 +120,14 @@ class Settings(BaseSettings):
     @property
     def allowed_hosts(self) -> frozenset[str]:
         return frozenset(h.strip().lower() for h in self.lms_allowed_hosts.split(",") if h.strip())
+
+    @property
+    def push_enabled(self) -> bool:
+        return bool(self.vapid_public_key and self.vapid_private_key)
+
+    @property
+    def push_hosts(self) -> tuple[str, ...]:
+        return tuple(h.strip().lower() for h in self.push_allowed_hosts.split(",") if h.strip())
 
     @property
     def auth_key(self) -> str:

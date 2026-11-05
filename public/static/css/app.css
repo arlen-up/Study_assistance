@@ -265,3 +265,16 @@ h1, h2, h3, h4 { margin: 0; }
 .plan-table th, .plan-table td { border-bottom: 1px solid var(--border); padding: 8px 6px; text-align: left; vertical-align: top; }
 .plan-table th { color: var(--muted); font-weight: 600; font-size: .78rem; }
 .encourage { font-weight: 600; color: #065f46; }
+
+/* ---------- 가상 펫 · 푸시 ---------- */
+.pet-card { display: flex; gap: 16px; align-items: center; }
+.pet-emoji { font-size: 3.2rem; line-height: 1; width: 72px; height: 72px; display: grid; place-items: center; background: var(--accent-soft); border-radius: 50%; flex: none; }
+.pet-body { display: grid; gap: 6px; flex: 1; min-width: 0; }
+.pet-name { font-weight: 800; font-size: 1.05rem; display: flex; gap: 6px; align-items: center; }
+.pet-card.mood-happy .pet-emoji { animation: pet-bounce 1.6s ease-in-out infinite; }
+.pet-card.mood-sad .pet-emoji { filter: grayscale(.6); background: #f4f4f5; }
+.pet-card.mood-waiting { border-color: #fcd34d; }
+@keyframes pet-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@media (prefers-reduced-motion: reduce) { .pet-card.mood-happy .pet-emoji { animation: none; } }
+.push-actions { margin: 8px 0; }
+.sync-row { justify-content: space-between; margin-top: 8px; }

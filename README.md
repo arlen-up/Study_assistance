@@ -7,6 +7,7 @@ RAG + MCP 기반 학습·진로 도우미 (해커톤 「내 전공 현장을 바
 - **마이크로 퀴즈**: 객관식·O/X·코드 빈칸 3문제 생성, 서버 채점
 - **복습 알림 · 학습 잔디**: 에빙하우스 망각 곡선(1·3·7일), GitHub식 1년 히트맵
 - **가상 코스모스 연동**: Moodle 4.5 Web Services 규격의 모의 LMS (과제·마감·강의 자료)
+- **푸시 알림 · 가상 펫**: 매일 저녁 하루 한 번 마감·복습 알림, 연속 학습에 따라 자라는 펫
 - **커리어 나비게이터**: 졸업 요건 분석 + 관심 직무별 다음 학기 과목 추천 ("계산은 파이썬, 조언은 AI")
 
 자세한 진행 기록은 [`docs/진행상황.md`](docs/진행상황.md)를 보세요.
@@ -69,7 +70,8 @@ uvicorn api.index:app --reload --port 8000
 | `LMS_API_KEY` | 도우미 ↔ 가상 학교 시스템 서버 간 비밀 키 (임의의 긴 문자열) |
 | `LMS_API_BASE_URL` | 외부 학사정보 API 주소 (비우면 가상 학사정보) |
 | `MOODLE_BASE_URL` | 코스모스(Moodle) 주소 (비우면 가상 코스모스) |
-| `VAPID_*`, `CRON_SECRET` | Web Push 알림, 매일 알림 Cron (다음 단계) |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | Web Push 알림 키 쌍 / 연락처(mailto:) |
+| `CRON_SECRET` | 매일 알림 Cron 인증 (Vercel이 `Authorization: Bearer`로 보냄) |
 
 ## 진짜 코스모스로 전환하려면 (학교 허가 후)
 

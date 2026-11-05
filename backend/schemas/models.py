@@ -297,6 +297,7 @@ class StreakResponse(BaseModel):
 class DashboardResponse(BaseModel):
     streak: StreakResponse
     reviews: ReviewListResponse
+    pet: "PetStatus | None" = None
 
 
 # ---------------------------------------------------------------------
@@ -311,3 +312,54 @@ class LmsLinkStatus(BaseModel):
     completed_credits: int = 0
     in_progress_credits: int = 0
     synced_at: dt.datetime | None = None
+
+
+# ---------------------------------------------------------------------
+# 가상 펫 · 푸시 알림
+# ---------------------------------------------------------------------
+PetMood = Literal["new", "happy", "waiting", "sad"]
+
+
+class PetStatus(BaseModel):
+    name: str
+    theme: str
+    stage_key: str
+    stage_label: str
+    emoji: str
+    mood: PetMood
+    message: str
+    current_streak: int
+    next_stage_label: str | None = None
+    days_to_next: int | None = None
+    progress_percent: int = 0
+
+
+class PushKeys(RequestModel):
+    p256dh: str = Field(min_length=40, max_length=200, pattern=r"^[A-Za-z0-9_\-=]+$")
+    auth: str = Field(min_length=10, max_length=64, pattern=r"^[A-Za-z0-9_\-=]+$")
+
+
+class PushSubscriptionIn(RequestModel):
+    endpoint: str = Field(min_length=20, max_length=2048, pattern=r"^https://")
+    keys: PushKeys
+    expirationTime: int | None = None  # noqa: N815 (브라우저 PushSubscription.toJSON() 필드명)
+
+
+class PushUnsubscribeIn(RequestModel):
+    endpoint: str = Field(min_length=20, max_length=2048, pattern=r"^https://")
+
+
+class PushResult(BaseModel):
+    ok: bool
+    delivered: int = 0
+    message: str
+
+
+class CronSummary(BaseModel):
+    users: int
+    synced: int
+    imported_materials: int
+    sent: int
+    skipped: int
+    failed: int
+    elapsed_seconds: float

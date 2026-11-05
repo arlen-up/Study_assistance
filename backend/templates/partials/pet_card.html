@@ -1,0 +1,19 @@
+{# 🦋 가상 펫 카드 — 컨셉(이모지·문구)은 backend/services/pet_service.py 에서 바꾼다 #}
+{% set pet = dashboard.pet %}
+{% if pet %}
+<section id="pet-card" class="card pet-card mood-{{ pet.mood }}"{% if oob %} hx-swap-oob="true"{% endif %}>
+  <div class="pet-emoji" aria-hidden="true">{{ pet.emoji }}</div>
+  <div class="pet-body">
+    <p class="pet-name">{{ pet.name }} <span class="badge secondary">{{ pet.stage_label }}</span></p>
+    <p class="small">{{ pet.message }}</p>
+    {% if pet.next_stage_label %}
+    <div class="progress" role="img" aria-label="다음 단계까지 {{ pet.days_to_next }}일">
+      <span class="done" style="width: {{ pet.progress_percent }}%"></span>
+    </div>
+    <p class="muted xsmall">{{ pet.days_to_next }}일 더 연속으로 공부하면 {{ pet.next_stage_label | with_ro }} 자라요</p>
+    {% else %}
+    <p class="muted xsmall">최고 단계에 도달했어요! 연속 기록을 지켜 주세요.</p>
+    {% endif %}
+  </div>
+</section>
+{% endif %}

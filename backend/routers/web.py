@@ -123,6 +123,7 @@ async def dashboard_page(
     user: WebUser,
     db: DbDep,
     lms: LmsDep,
+    settings: SettingsDep,
     tab: Annotated[str, Query()] = "chat",
     quiz_doc: Annotated[str | None, Query()] = None,
 ) -> HTMLResponse:
@@ -147,6 +148,7 @@ async def dashboard_page(
             "quiz_doc": quiz_doc or "",
             **await _lms_context(db, lms, user.id),
             **await _career_context(db, user.id),
+            "vapid_public_key": settings.vapid_public_key if settings.push_enabled else None,
         },
     )
 
@@ -370,3 +372,15 @@ async def ui_career(
         await career_service.set_target_job(db, user.id, job_role)
     report = await career_service.build_report(db, lms, user.id, agent, job_role or None)
     return _render(request, "partials/career_report.html", {"report": report})
+
+
+@router.post("/ui/lms/sync", response_class=HTMLResponse)
+async def ui_lms_sync(request: Request, user: WebUser, db: DbDep, settings: SettingsDep, lms: LmsDep) -> HTMLResponse:
+    """코스모스·학사정보 즉시 동기화: 성적 갱신 + 새 강의 자료 자동 가져오기."""
+    result = await lms_link_service.sync_user(db, settings, lms, user.id)
+    if result.imported_titles:
+        message = f"새 강의 자료 {len(result.imported_titles)}개를 가져왔어요: " + ", ".join(result.imported_titles[:3])
+    else:
+        message = f"최신 상태예요. 미제출 과제 {result.open_assignments}개, 이수 {result.completed_credits}학점."
+    context = {**await _lms_context(db, lms, user.id), **await _career_context(db, user.id), "sync_message": message}
+    return _render_lms_panel(request, context)

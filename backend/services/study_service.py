@@ -18,7 +18,7 @@ from backend.schemas.models import (
     QuizResponse,
     QuizSubmitResponse,
 )
-from backend.services import quiz_service, review_service, streak_service
+from backend.services import pet_service, quiz_service, review_service, streak_service
 from backend.services.agent_service import AgentService
 from backend.services.document_service import detect_source_type, ingest_document, parse_bytes, parse_plain_text
 from backend.services.embedding_service import EmbeddingService
@@ -41,12 +41,22 @@ async def list_documents(db: AsyncClient, limit: int = 30) -> list[DocumentItem]
     return [DocumentItem.model_validate(row) for row in res.data]
 
 
+async def get_pet_name(db: AsyncClient, user_id: UUID) -> str | None:
+    try:
+        res = await db.table("users").select("pet_name").eq("id", str(user_id)).limit(1).execute()
+    except Exception:
+        logger.warning("pet_name 조회 실패 — 기본 이름 사용")
+        return None
+    return res.data[0].get("pet_name") if res.data else None
+
+
 async def get_dashboard(db: AsyncClient, user_id: UUID) -> DashboardResponse:
-    streak, reviews = await asyncio.gather(
+    streak, reviews, pet_name = await asyncio.gather(
         streak_service.get_streak(db, user_id, 365),
         review_service.list_reviews(db, user_id),
+        get_pet_name(db, user_id),
     )
-    return DashboardResponse(streak=streak, reviews=reviews)
+    return DashboardResponse(streak=streak, reviews=reviews, pet=pet_service.pet_status(streak, pet_name))
 
 
 async def upload_document(

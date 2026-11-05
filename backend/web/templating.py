@@ -9,6 +9,7 @@ from fastapi.templating import Jinja2Templates
 from backend import __version__
 from backend.integrations.lms_client import CATEGORY_LABELS
 from backend.schemas.models import HeatmapDay
+from backend.services.pet_service import with_ro
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 KST = dt.timezone(dt.timedelta(hours=9), name="KST")  # 한국은 서머타임이 없어 고정 오프셋으로 충분
@@ -74,6 +75,7 @@ def build_heatmap(days: list[HeatmapDay]) -> list[HeatmapWeek]:
 
 
 templates.env.filters["kst"] = kst_datetime
+templates.env.filters["with_ro"] = with_ro
 templates.env.filters["relative_days"] = relative_days
 templates.env.filters["category_label"] = lambda c: CATEGORY_LABELS.get(str(c), str(c))
 templates.env.globals["app_version"] = __version__

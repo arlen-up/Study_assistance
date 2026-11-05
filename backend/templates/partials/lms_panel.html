@@ -33,7 +33,13 @@
     {% else %}
     <p class="muted small">남은 과제가 없어요 🎉</p>
     {% endif %}
-    {% if lms_status.synced_at %}<p class="muted xsmall">마지막 동기화 {{ lms_status.synced_at | kst }}</p>{% endif %}
+    {% if sync_message %}<div class="alert info small" role="status">{{ sync_message }}</div>{% endif %}
+    <div class="row sync-row">
+      {% if lms_status.synced_at %}<p class="muted xsmall">마지막 동기화 {{ lms_status.synced_at | kst }}</p>{% endif %}
+      <button type="button" class="btn outline sm" hx-post="/ui/lms/sync" hx-target="#lms-panel" hx-swap="outerHTML"
+              hx-disabled-elt="this" hx-indicator="#lms-sync-loading">🔄 지금 동기화</button>
+    </div>
+    <p id="lms-sync-loading" class="htmx-indicator muted small"><span class="spinner"></span> 코스모스에서 새 자료와 과제를 확인하는 중…</p>
 
   {% else %}
     <p class="muted small">가상 LMS 계정을 연결하면 성적표·과제·강의 자료를 AI가 함께 분석해요.</p>

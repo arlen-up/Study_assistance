@@ -1,0 +1,11 @@
+{# 📲 브라우저 푸시 알림 설정 — 동작은 /static/js/push.js #}
+<section id="push-card" class="card" data-vapid-key="{{ vapid_public_key or '' }}">
+  <h2 class="card-title">📲 푸시 알림</h2>
+  <p class="small muted" data-push-status>알림 상태를 확인하는 중…</p>
+  <div class="row push-actions">
+    <button type="button" class="btn primary sm" data-push-enable>알림 켜기</button>
+    <button type="button" class="btn outline sm" data-push-test hidden>테스트 알림</button>
+    <button type="button" class="btn outline sm" data-push-disable hidden>알림 끄기</button>
+  </div>
+  <p class="muted xsmall">매일 저녁 8시쯤 하루 한 번: 마감 임박 과제 → 복습할 교안 → 연속 학습 위기 순서로 알려드려요.</p>
+</section>

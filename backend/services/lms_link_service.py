@@ -10,6 +10,7 @@ import logging
 from typing import Any
 from uuid import UUID
 
+from pydantic import BaseModel, Field
 from supabase import AsyncClient
 
 from backend.core.config import Settings
@@ -211,4 +212,42 @@ async def import_material(
         week_no=material.week_no,
         keywords=[],
         source_url=source_url,
+    )
+
+
+# ---------------------------------------------------------------------
+# 자동 동기화 (매일 Cron · '지금 동기화' 버튼)
+# ---------------------------------------------------------------------
+class SyncResult(BaseModel):
+    linked: bool
+    completed_credits: int = 0
+    imported_titles: list[str] = Field(default_factory=list)
+    open_assignments: int = 0
+
+
+async def sync_user(
+    db: AsyncClient, settings: Settings, lms: LmsClient, user_id: UUID, max_imports: int = 5
+) -> SyncResult:
+    """성적 동기화 + 코스모스에 새로 올라온 강의 자료를 RAG 인덱스로 자동 가져오기."""
+    student_id = await get_student_id(db, user_id)
+    if student_id is None:
+        return SyncResult(linked=False)
+    transcript = await sync_transcript(db, lms, user_id, student_id)
+    materials = await lms.list_student_materials(student_id)
+    done = await imported_material_ids(db)
+    imported: list[str] = []
+    for material in [m for m in materials if m.id not in done][:max_imports]:
+        try:
+            result = await import_material(db, settings, lms, user_id, material.id)
+        except AppError as exc:
+            logger.warning("자료 자동 가져오기 실패 (%s): %s", material.id, exc.code)
+            continue
+        if not result.already_imported:
+            imported.append(result.title)
+    assignments = await lms.list_open_assignments(student_id)
+    return SyncResult(
+        linked=True,
+        completed_credits=transcript.completed_credits,
+        imported_titles=imported,
+        open_assignments=len(assignments),
     )
