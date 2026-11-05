@@ -28,15 +28,18 @@ class Settings(BaseSettings):
     # --- LLM (OpenAI 호환 API: OpenAI, Azure OpenAI 호환 게이트웨이, 로컬 vLLM 등) ---
     llm_api_key: SecretStr
     llm_base_url: str = "https://api.openai.com/v1"
-    llm_chat_model: str = "gpt-4o-mini"
+    llm_chat_model: str = "gpt-6-luna"
     llm_embedding_model: str = "text-embedding-3-small"  # 1536차원
+    # 추론 모델 설정. gpt-6-luna는 Chat Completions에서 함수 호출을 쓰려면 "none"이어야 한다.
+    # 추론 기능이 없는 다른 OpenAI 호환 모델을 쓸 때는 빈 값으로 두면 요청에서 빠진다.
+    llm_reasoning_effort: str | None = "none"
 
     # --- 임베딩 ---
     embedding_dimensions: int = Field(default=1536, ge=1, le=4096)
     embedding_send_dimensions: bool = False
 
     # --- LLM / 에이전트 ---
-    llm_temperature: float = Field(default=0.2, ge=0.0, le=2.0)
+    llm_temperature: float | None = Field(default=None, ge=0.0, le=2.0)  # None이면 모델 기본값 (추론 모델 호환)
     llm_timeout_seconds: float = Field(default=40.0, gt=0, le=55)
     agent_max_iterations: int = Field(default=5, ge=1, le=10)
 
@@ -61,6 +64,21 @@ class Settings(BaseSettings):
         if not value:
             raise ValueError("빈 값일 수 없습니다")
         return value
+
+    @field_validator("llm_reasoning_effort", mode="before")
+    @classmethod
+    def _validate_reasoning_effort(cls, value: object) -> str | None:
+        if value is None or (isinstance(value, str) and not value.strip()):
+            return None
+        effort = str(value).strip().lower()
+        if effort not in {"none", "low", "medium", "high", "xhigh", "max"}:
+            raise ValueError("none, low, medium, high, xhigh, max 중 하나여야 합니다")
+        return effort
+
+    @field_validator("llm_temperature", mode="before")
+    @classmethod
+    def _blank_temperature(cls, value: object) -> object:
+        return None if isinstance(value, str) and not value.strip() else value
 
     @property
     def allowed_hosts(self) -> frozenset[str]:

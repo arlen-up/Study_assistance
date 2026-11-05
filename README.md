@@ -14,7 +14,7 @@ RAG + MCP 기반 가상 LMS 학습 도우미 (해커톤 「내 전공 현장을 
 |---|---|
 | 화면 | FastAPI + Jinja2 템플릿 + HTMX(화면 일부 교체) + 순수 CSS |
 | API | FastAPI, Pydantic |
-| AI | LangChain + MCP Python SDK, OpenAI 호환 API |
+| AI | LangChain + MCP Python SDK, OpenAI GPT (`gpt-6-luna`, `text-embedding-3-small`) |
 | DB·로그인 | Supabase (PostgreSQL, pgvector, Auth) |
 | 배포 | GitHub + Vercel (Python 서버리스 함수) |
 
@@ -58,5 +58,6 @@ uvicorn api.index:app --reload --port 8000
 | `SUPABASE_PUBLISHABLE_KEY` | 로그인·토큰 갱신용 공개 키 (권장) |
 | `LLM_API_KEY` | OpenAI 호환 API 키 |
 | `LLM_BASE_URL` | 기본 `https://api.openai.com/v1` |
-| `LLM_CHAT_MODEL` | 기본 `gpt-4o-mini` |
+| `LLM_CHAT_MODEL` | 기본 `gpt-6-luna` |
+| `LLM_REASONING_EFFORT` | 기본 `none` (gpt-6-luna가 Chat Completions에서 함수 호출을 쓰려면 필요) |
 | `LLM_EMBEDDING_MODEL` | 기본 `text-embedding-3-small` (1536차원) |

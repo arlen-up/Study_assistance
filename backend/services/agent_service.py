@@ -98,11 +98,14 @@ class AgentService:
         self._settings = settings
         self._db = db
         self._embeddings = embeddings or EmbeddingService(settings)
+        # temperature / reasoning_effort는 None이면 요청에 넣지 않는다.
+        # (gpt-6-luna 같은 추론 모델은 Chat Completions에서 함수 호출 시 reasoning_effort="none"이 필요)
         self._llm = ChatOpenAI(
             model=settings.llm_chat_model,
             api_key=settings.llm_api_key,
             base_url=settings.llm_base_url,
             temperature=settings.llm_temperature,
+            reasoning_effort=settings.llm_reasoning_effort,
             timeout=settings.llm_timeout_seconds,
             max_retries=2,
         )
