@@ -1,6 +1,6 @@
-{# 🏫 가상 LMS 연동 패널: 연결 상태 · 이수 학점 · 미제출 과제 #}
+{# 🎓 내 학점 알아보기 패널 (가상 LMS 연동): 연결 상태 · 이수 학점 · 미제출 과제 #}
 <section id="lms-panel" class="card">
-  <h2 class="card-title">🏫 가상 코스모스</h2>
+  <h2 class="card-title">🎓 내 학점 알아보기</h2>
 
   {% if lms_error %}
     <div class="alert danger small" role="alert">{{ lms_error }}</div>
@@ -39,13 +39,13 @@
       <button type="button" class="btn outline sm" hx-post="/ui/lms/sync" hx-target="#lms-panel" hx-swap="outerHTML"
               hx-disabled-elt="this" hx-indicator="#lms-sync-loading">🔄 지금 동기화</button>
     </div>
-    <p id="lms-sync-loading" class="htmx-indicator muted small"><span class="spinner"></span> 코스모스에서 새 자료와 과제를 확인하는 중…</p>
+    <p id="lms-sync-loading" class="htmx-indicator muted small"><span class="spinner"></span> 학교 시스템에서 새 자료와 과제를 확인하는 중…</p>
 
   {% else %}
-    <p class="muted small">가상 LMS 계정을 연결하면 성적표·과제·강의 자료를 AI가 함께 분석해요.</p>
+    <p class="muted small">학교 계정을 연결하면 이수 학점·과제·강의 자료를 한눈에 보고, AI가 함께 분석해요.</p>
     <button type="button" class="btn primary block" hx-post="/ui/lms/link" hx-target="#lms-panel" hx-swap="outerHTML"
-            hx-disabled-elt="this" hx-indicator="#lms-loading">시연용 LMS 계정 연결</button>
-    <p id="lms-loading" class="htmx-indicator muted small"><span class="spinner"></span> LMS에서 성적표를 가져오는 중…</p>
+            hx-disabled-elt="this" hx-indicator="#lms-loading">학교 계정 연결 (시연용)</button>
+    <p id="lms-loading" class="htmx-indicator muted small"><span class="spinner"></span> 학교 시스템에서 성적표를 가져오는 중…</p>
   {% endif %}
 </section>
 

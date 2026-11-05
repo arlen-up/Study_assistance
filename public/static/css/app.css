@@ -156,20 +156,31 @@ h1, h2, h3, h4 { margin: 0; }
 .tab-nav label { flex: 1; text-align: center; padding: 8px 10px; border-radius: 7px; font-size: .875rem; font-weight: 600; color: var(--muted); cursor: pointer; }
 .tab-nav label:hover { background: #f4f4f5; }
 .tab-panel { display: none; }
-#tab-chat:checked ~ .tab-panels #panel-chat,
-#tab-summary:checked ~ .tab-panels #panel-summary,
-#tab-quiz:checked ~ .tab-panels #panel-quiz,
-#tab-upload:checked ~ .tab-panels #panel-upload,
-#tab-career:checked ~ .tab-panels #panel-career,
-#tab-flashcards:checked ~ .tab-panels #panel-flashcards,
-#tab-mindmap:checked ~ .tab-panels #panel-mindmap { display: block; }
-#tab-chat:checked ~ .tab-nav label[for="tab-chat"],
-#tab-summary:checked ~ .tab-nav label[for="tab-summary"],
-#tab-quiz:checked ~ .tab-nav label[for="tab-quiz"],
-#tab-upload:checked ~ .tab-nav label[for="tab-upload"],
-#tab-career:checked ~ .tab-nav label[for="tab-career"],
-#tab-flashcards:checked ~ .tab-nav label[for="tab-flashcards"],
-#tab-mindmap:checked ~ .tab-nav label[for="tab-mindmap"] { background: var(--primary); color: var(--primary-text); }
+/* 1단: 묶음 (교안·챗봇 / 복습하기 / 내 학점·진로) */
+#tab-study:checked ~ .tab-panels #panel-study,
+#tab-review:checked ~ .tab-panels #panel-review,
+#tab-grades:checked ~ .tab-panels #panel-grades { display: grid; gap: 14px; }
+#tab-study:checked ~ .tab-nav label[for="tab-study"],
+#tab-review:checked ~ .tab-nav label[for="tab-review"],
+#tab-grades:checked ~ .tab-nav label[for="tab-grades"] { background: var(--primary); color: var(--primary-text); }
+/* 2단: 묶음 안의 도구 */
+.subtab-nav { display: flex; gap: 6px; flex-wrap: wrap; }
+.subtab-nav label { padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px; background: #fff; font-size: .82rem; font-weight: 600; color: var(--muted); cursor: pointer; }
+.subtab-nav label:hover { background: #f4f4f5; }
+.subtab-panel { display: none; }
+#tab-chat:checked ~ .subtab-panels #panel-chat,
+#tab-upload:checked ~ .subtab-panels #panel-upload,
+#tab-summary:checked ~ .subtab-panels #panel-summary,
+#tab-quiz:checked ~ .subtab-panels #panel-quiz,
+#tab-flashcards:checked ~ .subtab-panels #panel-flashcards,
+#tab-mindmap:checked ~ .subtab-panels #panel-mindmap { display: block; }
+#tab-chat:checked ~ .subtab-nav label[for="tab-chat"],
+#tab-upload:checked ~ .subtab-nav label[for="tab-upload"],
+#tab-summary:checked ~ .subtab-nav label[for="tab-summary"],
+#tab-quiz:checked ~ .subtab-nav label[for="tab-quiz"],
+#tab-flashcards:checked ~ .subtab-nav label[for="tab-flashcards"],
+#tab-mindmap:checked ~ .subtab-nav label[for="tab-mindmap"] { border-color: var(--primary); color: var(--primary); background: #fff; }
+.tab-radio:focus-visible ~ .subtab-nav { outline: 3px solid rgba(5,150,105,.35); border-radius: var(--radius); }
 .tab-radio:focus-visible ~ .tab-nav { outline: 3px solid rgba(5,150,105,.35); }
 
 /* ---------- 챗봇 ---------- */

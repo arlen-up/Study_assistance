@@ -25,123 +25,146 @@
 
   <div class="layout">
     <section class="tabs">
-      {# 라디오 버튼 + CSS로 만든 탭: JS 없이 전환되고, 탭을 바꿔도 내용이 유지된다 #}
-      {% for key, label in [("chat", "💬 챗봇"), ("summary", "⏱ 3분 요약"), ("quiz", "🧠 퀴즈"), ("flashcards", "🃏 플래시카드"), ("mindmap", "🗺 마인드맵"), ("career", "🧭 커리어"), ("upload", "📤 교안 등록")] %}
-      <input class="tab-radio" type="radio" name="tab" id="tab-{{ key }}"{% if active_tab == key %} checked{% endif %}>
+      {# 라디오 버튼 + CSS로 만든 2단 탭: JS 없이 전환되고, 탭을 바꿔도 내용이 유지된다
+         예전 주소(?tab=quiz 등)도 그대로 동작하도록 하위 탭 이름으로 묶음을 정한다 #}
+      {% set group_of = {"chat": "study", "upload": "study", "summary": "review", "quiz": "review",
+                         "flashcards": "review", "mindmap": "review", "career": "grades"} %}
+      {% set active_group = group_of.get(active_tab, "study") %}
+      {% for key in ["study", "review", "grades"] %}
+      <input class="tab-radio" type="radio" name="tab-group" id="tab-{{ key }}"{% if active_group == key %} checked{% endif %}>
       {% endfor %}
-      <nav class="tab-nav" aria-label="학습 도구">
-        <label for="tab-chat">💬 <span class="hide-sm">챗봇</span></label>
-        <label for="tab-summary">⏱ <span class="hide-sm">3분 요약</span></label>
-        <label for="tab-quiz">🧠 <span class="hide-sm">퀴즈</span></label>
-        <label for="tab-flashcards">🃏 <span class="hide-sm">카드</span></label>
-        <label for="tab-mindmap">🗺 <span class="hide-sm">마인드맵</span></label>
-        <label for="tab-career">🧭 <span class="hide-sm">커리어</span></label>
-        <label for="tab-upload">📤 <span class="hide-sm">교안 등록</span></label>
+      <nav class="tab-nav" aria-label="학습 메뉴">
+        <label for="tab-study">📚 <span class="hide-sm">교안·챗봇</span></label>
+        <label for="tab-review">📝 <span class="hide-sm">복습하기</span></label>
+        <label for="tab-grades">🎓 <span class="hide-sm">내 학점·진로</span></label>
       </nav>
 
       <div class="tab-panels">
-        {# ---------------- 챗봇 ---------------- #}
-        <div class="tab-panel card" id="panel-chat">
-          <h2 class="card-title">💬 교안 챗봇</h2>
-          <p class="muted small">AI가 MCP 도구로 교안을 검색해서 출처와 함께 답해요</p>
-          <form class="chat" hx-post="/ui/chat" hx-target="#chat-log" hx-swap="beforeend scroll:#chat-log:bottom"
-                hx-indicator="#chat-loading" hx-disabled-elt="find button">
-            <div class="row">
-              {{ m.doc_select("chat-doc", documents, "", "전체 교안에서 검색") }}
-              <label class="check"><input type="checkbox" name="include_summary"> 3분 요약 포함</label>
+        {# ================ 📚 교안·챗봇 ================ #}
+        <div class="tab-panel subtabs" id="panel-study">
+          {% for key in ["chat", "upload"] %}
+          <input class="tab-radio" type="radio" name="tab-study" id="tab-{{ key }}"{% if active_tab == key or (key == "chat" and active_tab != "upload") %} checked{% endif %}>
+          {% endfor %}
+          <nav class="subtab-nav" aria-label="교안·챗봇">
+            <label for="tab-chat">💬 챗봇</label>
+            <label for="tab-upload">📤 교안 등록</label>
+          </nav>
+          <div class="subtab-panels">
+            <div class="subtab-panel card" id="panel-chat">
+              <h2 class="card-title">💬 교안 챗봇</h2>
+              <p class="muted small">AI가 MCP 도구로 교안을 검색해서 출처와 함께 답해요</p>
+              <form class="chat" hx-post="/ui/chat" hx-target="#chat-log" hx-swap="beforeend scroll:#chat-log:bottom"
+                    hx-indicator="#chat-loading" hx-disabled-elt="find button">
+                <div class="row">
+                  {{ m.doc_select("chat-doc", documents, "", "전체 교안에서 검색") }}
+                  <label class="check"><input type="checkbox" name="include_summary"> 3분 요약 포함</label>
+                </div>
+                <input type="hidden" id="chat-history" name="history" value="[]">
+                <div id="chat-log" class="chat-log" aria-live="polite">
+                  <p id="chat-empty" class="empty">예: “스택과 큐의 차이를 예시로 설명해줘”</p>
+                </div>
+                <p id="chat-loading" class="htmx-indicator muted small"><span class="spinner"></span> 교안을 찾아보는 중…</p>
+                <div class="chat-input-row">
+                  <textarea id="chat-input" name="message" class="textarea" rows="2" maxlength="2000" required
+                            placeholder="궁금한 내용을 입력하세요"></textarea>
+                  <button type="submit" class="btn primary">보내기</button>
+                </div>
+              </form>
             </div>
-            <input type="hidden" id="chat-history" name="history" value="[]">
-            <div id="chat-log" class="chat-log" aria-live="polite">
-              <p id="chat-empty" class="empty">예: “스택과 큐의 차이를 예시로 설명해줘”</p>
+
+            <div class="subtab-panel card" id="panel-upload">
+              <h2 class="card-title">📤 교안 등록</h2>
+              <p class="muted small">PDF·Markdown·HTML·TXT 파일 또는 텍스트를 올리면 검색할 수 있게 저장해요</p>
+              {% include "partials/lms_materials.html" %}
+              <hr class="divider">
+              {% include "partials/upload_form.html" %}
+              <div id="upload-result"></div>
             </div>
-            <p id="chat-loading" class="htmx-indicator muted small"><span class="spinner"></span> 교안을 찾아보는 중…</p>
-            <div class="chat-input-row">
-              <textarea id="chat-input" name="message" class="textarea" rows="2" maxlength="2000" required
-                        placeholder="궁금한 내용을 입력하세요"></textarea>
-              <button type="submit" class="btn primary">보내기</button>
+          </div>
+        </div>
+
+        {# ================ 📝 복습하기 ================ #}
+        <div class="tab-panel subtabs" id="panel-review">
+          {% set active_tool = active_tab if group_of.get(active_tab) == "review" else "summary" %}
+          {% for key in ["summary", "quiz", "flashcards", "mindmap"] %}
+          <input class="tab-radio" type="radio" name="tab-review" id="tab-{{ key }}"{% if active_tool == key %} checked{% endif %}>
+          {% endfor %}
+          <nav class="subtab-nav" aria-label="복습 도구">
+            <label for="tab-summary">⏱ <span class="hide-sm">3분 </span>요약</label>
+            <label for="tab-quiz">🧠 퀴즈</label>
+            <label for="tab-flashcards">🃏 카드</label>
+            <label for="tab-mindmap">🗺 <span class="hide-sm">마인드맵</span></label>
+          </nav>
+          <div class="subtab-panels">
+            <div class="subtab-panel card" id="panel-summary">
+              <h2 class="card-title">⏱ 3분 핵심 요약</h2>
+              <p class="muted small">교안을 골라 3분 안에 복습할 수 있는 요약을 만들어요</p>
+              <form class="row" hx-post="/ui/summary" hx-target="#summary-result" hx-indicator="#summary-loading"
+                    hx-disabled-elt="find button">
+                {{ m.doc_select("summary-doc", documents, "", "교안을 선택하세요") }}
+                <button type="submit" class="btn primary">요약하기</button>
+              </form>
+              <p id="summary-loading" class="htmx-indicator muted small"><span class="spinner"></span> 교안을 읽고 핵심을 정리하는 중…</p>
+              <div id="summary-result"></div>
             </div>
-          </form>
+
+            <div class="subtab-panel card" id="panel-quiz">
+              <h2 class="card-title">🧠 마이크로 퀴즈</h2>
+              <p class="muted small">AI가 오늘 교안의 핵심 키워드로 3문제를 만들어요 (객관식 · O/X · 코드 빈칸)</p>
+              <form class="row" hx-post="/ui/quiz" hx-target="#quiz-area" hx-indicator="#quiz-loading"
+                    hx-disabled-elt="find button">
+                {{ m.doc_select("quiz-doc", documents, quiz_doc, "오늘의 교안 (가장 최근)") }}
+                <select name="difficulty" class="select narrow" aria-label="난이도">
+                  <option value="easy">쉬움</option>
+                  <option value="medium" selected>보통</option>
+                  <option value="hard">어려움</option>
+                </select>
+                <button type="submit" class="btn primary">퀴즈 만들기</button>
+              </form>
+              <p id="quiz-loading" class="htmx-indicator muted small"><span class="spinner"></span> 교안에서 키워드를 찾고 문제를 만드는 중…</p>
+              <div id="quiz-area"></div>
+            </div>
+
+            <div class="subtab-panel card" id="panel-flashcards">
+              <h2 class="card-title">🃏 플래시카드</h2>
+              <p class="muted small">AI가 교안의 핵심 용어로 카드를 만들어요. 카드를 눌러 뒤집고, 아는지 스스로 체크해요</p>
+              <form class="row" hx-post="/ui/flashcards" hx-target="#flashcards-area" hx-indicator="#flashcards-loading"
+                    hx-disabled-elt="find button">
+                {{ m.doc_select("flashcards-doc", documents, "", "교안을 선택하세요") }}
+                <button type="submit" class="btn primary">카드 만들기</button>
+              </form>
+              <p id="flashcards-loading" class="htmx-indicator muted small"><span class="spinner"></span> 교안을 읽고 카드를 만드는 중…</p>
+              <div id="flashcards-area"></div>
+            </div>
+
+            <div class="subtab-panel card" id="panel-mindmap">
+              <h2 class="card-title">🗺 마인드맵</h2>
+              <p class="muted small">교안을 한눈에 보는 개념 지도예요. 개념을 누르면 챗봇에 질문이 들어가요</p>
+              <form class="row" hx-post="/ui/mindmap" hx-target="#mindmap-area" hx-indicator="#mindmap-loading"
+                    hx-disabled-elt="find button">
+                {{ m.doc_select("mindmap-doc", documents, "", "교안을 선택하세요") }}
+                <button type="submit" class="btn primary">마인드맵 그리기</button>
+              </form>
+              <p id="mindmap-loading" class="htmx-indicator muted small"><span class="spinner"></span> 교안 구조를 정리하는 중…</p>
+              <div id="mindmap-area"></div>
+            </div>
+          </div>
         </div>
 
-        {# ---------------- 3분 요약 ---------------- #}
-        <div class="tab-panel card" id="panel-summary">
-          <h2 class="card-title">⏱ 3분 핵심 요약</h2>
-          <p class="muted small">교안을 골라 3분 안에 복습할 수 있는 요약을 만들어요</p>
-          <form class="row" hx-post="/ui/summary" hx-target="#summary-result" hx-indicator="#summary-loading"
-                hx-disabled-elt="find button">
-            {{ m.doc_select("summary-doc", documents, "", "교안을 선택하세요") }}
-            <button type="submit" class="btn primary">요약하기</button>
-          </form>
-          <p id="summary-loading" class="htmx-indicator muted small"><span class="spinner"></span> 교안을 읽고 핵심을 정리하는 중…</p>
-          <div id="summary-result"></div>
-        </div>
-
-        {# ---------------- 퀴즈 ---------------- #}
-        <div class="tab-panel card" id="panel-quiz">
-          <h2 class="card-title">🧠 마이크로 퀴즈</h2>
-          <p class="muted small">AI가 오늘 교안의 핵심 키워드로 3문제를 만들어요 (객관식 · O/X · 코드 빈칸)</p>
-          <form class="row" hx-post="/ui/quiz" hx-target="#quiz-area" hx-indicator="#quiz-loading"
-                hx-disabled-elt="find button">
-            {{ m.doc_select("quiz-doc", documents, quiz_doc, "오늘의 교안 (가장 최근)") }}
-            <select name="difficulty" class="select narrow" aria-label="난이도">
-              <option value="easy">쉬움</option>
-              <option value="medium" selected>보통</option>
-              <option value="hard">어려움</option>
-            </select>
-            <button type="submit" class="btn primary">퀴즈 만들기</button>
-          </form>
-          <p id="quiz-loading" class="htmx-indicator muted small"><span class="spinner"></span> 교안에서 키워드를 찾고 문제를 만드는 중…</p>
-          <div id="quiz-area"></div>
-        </div>
-
-        {# ---------------- 플래시카드 ---------------- #}
-        <div class="tab-panel card" id="panel-flashcards">
-          <h2 class="card-title">🃏 플래시카드</h2>
-          <p class="muted small">AI가 교안의 핵심 용어로 카드를 만들어요. 카드를 눌러 뒤집고, 아는지 스스로 체크해요</p>
-          <form class="row" hx-post="/ui/flashcards" hx-target="#flashcards-area" hx-indicator="#flashcards-loading"
-                hx-disabled-elt="find button">
-            {{ m.doc_select("flashcards-doc", documents, "", "교안을 선택하세요") }}
-            <button type="submit" class="btn primary">카드 만들기</button>
-          </form>
-          <p id="flashcards-loading" class="htmx-indicator muted small"><span class="spinner"></span> 교안을 읽고 카드를 만드는 중…</p>
-          <div id="flashcards-area"></div>
-        </div>
-
-        {# ---------------- 마인드맵 ---------------- #}
-        <div class="tab-panel card" id="panel-mindmap">
-          <h2 class="card-title">🗺 마인드맵</h2>
-          <p class="muted small">교안을 한눈에 보는 개념 지도예요. 개념을 누르면 챗봇에 질문이 들어가요</p>
-          <form class="row" hx-post="/ui/mindmap" hx-target="#mindmap-area" hx-indicator="#mindmap-loading"
-                hx-disabled-elt="find button">
-            {{ m.doc_select("mindmap-doc", documents, "", "교안을 선택하세요") }}
-            <button type="submit" class="btn primary">마인드맵 그리기</button>
-          </form>
-          <p id="mindmap-loading" class="htmx-indicator muted small"><span class="spinner"></span> 교안 구조를 정리하는 중…</p>
-          <div id="mindmap-area"></div>
-        </div>
-
-        {# ---------------- 커리어 나비게이터 ---------------- #}
-        <div class="tab-panel card" id="panel-career">
-          <h2 class="card-title">🧭 커리어 나비게이터</h2>
-          <p class="muted small">LMS 성적표와 관심 직무로 졸업까지 남은 요건과 다음 학기 추천 과목을 알려줘요</p>
-          {% include "partials/career_form.html" %}
-          <div id="career-result"></div>
-        </div>
-
-        {# ---------------- 교안 등록 ---------------- #}
-        <div class="tab-panel card" id="panel-upload">
-          <h2 class="card-title">📤 교안 등록</h2>
-          <p class="muted small">PDF·Markdown·HTML·TXT 파일 또는 텍스트를 올리면 검색할 수 있게 저장해요</p>
-          {% include "partials/lms_materials.html" %}
-          <hr class="divider">
-          {% include "partials/upload_form.html" %}
-          <div id="upload-result"></div>
+        {# ================ 🎓 내 학점·진로 ================ #}
+        <div class="tab-panel stack" id="panel-grades">
+          {% include "partials/lms_panel.html" %}
+          <div class="card" id="panel-career">
+              <h2 class="card-title">🧭 커리어 나비게이터</h2>
+              <p class="muted small">내 성적표와 관심 직무로 졸업까지 남은 요건과 다음 학기 추천 과목을 알려줘요</p>
+              {% include "partials/career_form.html" %}
+            <div id="career-result"></div>
+          </div>
         </div>
       </div>
     </section>
 
     <aside class="stack">
-      {% include "partials/lms_panel.html" %}
       {% include "partials/push_card.html" %}
       {% if dashboard %}{% include "partials/reviews.html" %}{% endif %}
     </aside>
