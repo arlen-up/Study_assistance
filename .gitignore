@@ -16,3 +16,4 @@ supabase/.branches/
 
 # OS
 .DS_Store
+.vercel
