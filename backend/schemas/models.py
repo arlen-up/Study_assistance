@@ -78,6 +78,7 @@ class DocumentIngestResponse(BaseModel):
     title: str
     chunk_count: int
     char_count: int
+    already_imported: bool = False  # LMS 자료를 이미 가져온 경우 True (중복 저장 안 함)
 
 
 # ---------------------------------------------------------------------
@@ -112,6 +113,7 @@ class ChatResponse(BaseModel):
     confidence: Literal["high", "medium", "low"]
     sources: list[SourceChunk]
     tool_calls: list[ToolCallTrace]
+    lms_data: list[str] = Field(default_factory=list)  # 답변에 사용한 LMS 데이터 (예: "성적표")
 
 
 # ---------------------------------------------------------------------
@@ -295,3 +297,17 @@ class StreakResponse(BaseModel):
 class DashboardResponse(BaseModel):
     streak: StreakResponse
     reviews: ReviewListResponse
+
+
+# ---------------------------------------------------------------------
+# 가상 LMS 연동
+# ---------------------------------------------------------------------
+class LmsLinkStatus(BaseModel):
+    linked: bool
+    student_id: UUID | None = None
+    student_no: str | None = None
+    name: str | None = None
+    department: str | None = None
+    completed_credits: int = 0
+    in_progress_credits: int = 0
+    synced_at: dt.datetime | None = None

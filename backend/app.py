@@ -15,8 +15,12 @@ from backend.core.errors import AppError
 from backend.routers import api, web
 from backend.web.session import LoginRequiredError, clear_session_cookies, set_session_cookies
 from backend.web.templating import templates
+from lms_mock.app import app as lms_app
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+# HTTP 클라이언트의 요청 URL 로그(학생 ID 등 쿼리 값 포함)는 남기지 않는다
+for _noisy in ("httpx", "httpcore", "hpack"):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
 logger = logging.getLogger("lms.app")
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -112,6 +116,9 @@ def create_app() -> FastAPI:
     # ---------------- 라우터 · 정적 파일 ----------------
     app.include_router(api.router)
     app.include_router(web.router)
+
+    # 🏫 가상 LMS 모의 서버: 독립 FastAPI 앱을 /lms 에 연결 (→ /lms/api/*, 문서 /lms/api/docs)
+    app.mount("/lms", lms_app, name="lms")
 
     # 로컬 개발용. Vercel에서는 public/ 폴더를 CDN이 직접 제공한다.
     if STATIC_DIR.is_dir():

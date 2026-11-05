@@ -268,3 +268,10 @@ async def ingest_document(
     return DocumentIngestResponse(
         document_id=UUID(document_id), title=title, chunk_count=len(chunks), char_count=len(full_text)
     )
+
+
+def html_to_text(markup: str) -> str:
+    """HTML(예: Moodle 페이지 본문)을 스크립트·스타일을 제외한 순수 텍스트로 바꾼다."""
+    extractor = _TextExtractor()
+    extractor.feed(markup or "")
+    return extractor.text()

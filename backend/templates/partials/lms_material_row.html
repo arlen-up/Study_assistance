@@ -1,0 +1,12 @@
+<li id="material-{{ m.id }}">
+  <div class="review-text">
+    <p class="review-title">[{{ m.course_name }}] {% if m.week_no %}{{ m.week_no }}주차 {% endif %}{{ m.title }}</p>
+    <p class="muted xsmall">{{ m.course_code }}{% if m.published_at %} · 게시 {{ m.published_at | kst }}{% endif %}</p>
+  </div>
+  {% if m.id | string in imported_ids %}
+    <span class="badge success">가져옴</span>
+  {% else %}
+    <button type="button" class="btn outline sm" hx-post="/ui/lms/materials/{{ m.id }}/import"
+            hx-target="#material-{{ m.id }}" hx-swap="outerHTML" hx-disabled-elt="this">가져오기</button>
+  {% endif %}
+</li>

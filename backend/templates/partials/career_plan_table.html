@@ -1,0 +1,31 @@
+{# AI 추천(a.semester_plan) 또는 기본 추천(plan_rows)을 같은 표로 보여준다 #}
+{% set reason_badge = {"retake_required": ("재수강", "danger"), "required_missing": ("필수", "warning"),
+                       "track_core": ("직무 핵심", "success"), "track_recommended": ("직무 추천", "secondary"),
+                       "elective_fill": ("전공선택", "outline")} %}
+<div class="table-wrap">
+  <table class="plan-table">
+    <thead><tr><th>과목</th><th>학점</th><th>구분</th><th>이유</th></tr></thead>
+    <tbody>
+      {% if report.advice %}
+        {% for item in report.advice.semester_plan %}
+        {% set c = item.course %}
+        <tr>
+          <td><strong>{{ c.name }}</strong><br><span class="muted xsmall">{{ c.code }}</span></td>
+          <td>{{ c.credits }}</td>
+          <td><span class="badge {{ reason_badge[c.reason_code][1] }}">{{ reason_badge[c.reason_code][0] }}</span></td>
+          <td class="small">{{ item.ai_reason }}</td>
+        </tr>
+        {% endfor %}
+      {% else %}
+        {% for c in plan_rows %}
+        <tr>
+          <td><strong>{{ c.name }}</strong><br><span class="muted xsmall">{{ c.code }}</span></td>
+          <td>{{ c.credits }}</td>
+          <td><span class="badge {{ reason_badge[c.reason_code][1] }}">{{ reason_badge[c.reason_code][0] }}</span></td>
+          <td class="small">{{ c.reason }}</td>
+        </tr>
+        {% endfor %}
+      {% endif %}
+    </tbody>
+  </table>
+</div>

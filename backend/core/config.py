@@ -47,7 +47,28 @@ class Settings(BaseSettings):
     lms_allowed_hosts: str = ""
     max_upload_bytes: int = Field(default=4_000_000, ge=1, le=4_400_000)  # Vercel 요청 본문 한도 4.5MB
 
+    # --- 가상 LMS 연동 ---
+    lms_api_key: SecretStr | None = None
+    lms_api_base_url: str | None = None  # 학사정보 API. 없으면 같은 앱 안의 가상 시스템을 직접 호출
+    moodle_base_url: str | None = None   # 코스모스(Moodle) 주소. 없으면 가상 코스모스
+    lms_timeout_seconds: float = Field(default=10.0, gt=0, le=30)
+
     app_timezone: str = "Asia/Seoul"
+
+    @field_validator("lms_api_key", "lms_api_base_url", "moodle_base_url", mode="before")
+    @classmethod
+    def _blank_optional(cls, value: object) -> object:
+        return None if isinstance(value, str) and not value.strip() else value
+
+    @field_validator("lms_api_base_url", "moodle_base_url")
+    @classmethod
+    def _validate_lms_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip().rstrip("/")
+        if not value.startswith(("https://", "http://")):
+            raise ValueError("주소는 http:// 또는 https:// 로 시작해야 합니다")
+        return value
 
     @field_validator("supabase_url", "llm_base_url")
     @classmethod

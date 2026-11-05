@@ -3,14 +3,16 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, File, Form, Query, UploadFile
+from fastapi import APIRouter, File, Form, Path, Query, UploadFile
 
 from backend import __version__
 from backend.core.auth import CurrentUser
 from backend.core.config import get_settings
 from backend.core.errors import ConfigError
 from backend.core.supabase_client import DbDep, SettingsDep
-from backend.routers.deps import AgentDep
+from backend.integrations.lms_client import LmsAssignment, LmsDep, LmsMaterialSummary, LmsSubmission, LmsTranscript
+from backend.routers.deps import ApiAgentDep
+from backend.schemas.career import CareerReport, CareerTargetRequest, CareerTrackItem
 from backend.schemas.models import (
     ChatRequest,
     ChatResponse,
@@ -19,6 +21,7 @@ from backend.schemas.models import (
     DocumentListResponse,
     ErrorResponse,
     HealthResponse,
+    LmsLinkStatus,
     QuizGenerateRequest,
     QuizResponse,
     QuizSubmitRequest,
@@ -28,7 +31,7 @@ from backend.schemas.models import (
     SummaryRequest,
     SummaryResponse,
 )
-from backend.services import review_service, streak_service, study_service
+from backend.services import career_service, lms_link_service, review_service, streak_service, study_service
 
 ERROR_RESPONSES: dict[int | str, dict[str, object]] = {
     400: {"model": ErrorResponse},
@@ -91,18 +94,18 @@ async def upload_document(
 
 # ---------------- 챗봇 · 요약 (MCP 에이전트) ----------------
 @router.post("/chat", response_model=ChatResponse, tags=["agent"])
-async def chat(body: ChatRequest, _user: CurrentUser, agent: AgentDep) -> ChatResponse:
+async def chat(body: ChatRequest, _user: CurrentUser, agent: ApiAgentDep) -> ChatResponse:
     return await agent.chat(body)
 
 
 @router.post("/summary", response_model=SummaryResponse, tags=["agent"])
-async def summary(body: SummaryRequest, _user: CurrentUser, agent: AgentDep) -> SummaryResponse:
+async def summary(body: SummaryRequest, _user: CurrentUser, agent: ApiAgentDep) -> SummaryResponse:
     return await agent.summarize(body.document_id)
 
 
 # ---------------- 퀴즈 ----------------
 @router.post("/quizzes", response_model=QuizResponse, status_code=201, tags=["quiz"])
-async def create_quiz(body: QuizGenerateRequest, user: CurrentUser, db: DbDep, agent: AgentDep) -> QuizResponse:
+async def create_quiz(body: QuizGenerateRequest, user: CurrentUser, db: DbDep, agent: ApiAgentDep) -> QuizResponse:
     return await study_service.create_quiz(agent, db, user.id, body.document_id, body.difficulty)
 
 
@@ -126,3 +129,76 @@ async def streak(user: CurrentUser, db: DbDep, days: Annotated[int, Query(ge=7, 
 @router.get("/dashboard", response_model=DashboardResponse, tags=["learning"])
 async def dashboard(user: CurrentUser, db: DbDep) -> DashboardResponse:
     return await study_service.get_dashboard(db, user.id)
+
+
+# ---------------- 가상 LMS 연동 (도우미 → LMS API 경유) ----------------
+@router.get("/lms/status", response_model=LmsLinkStatus, tags=["lms"])
+async def lms_status(user: CurrentUser, db: DbDep, lms: LmsDep) -> LmsLinkStatus:
+    return await lms_link_service.get_status(db, lms, user.id)
+
+
+@router.post("/lms/link-demo", response_model=LmsLinkStatus, tags=["lms"])
+async def lms_link_demo(user: CurrentUser, db: DbDep, lms: LmsDep) -> LmsLinkStatus:
+    """시연용 가상 LMS 학생을 만들어 현재 계정과 연결하고 성적을 동기화한다."""
+    return await lms_link_service.link_demo_account(db, lms, user)
+
+
+@router.get("/lms/transcript", response_model=LmsTranscript, tags=["lms"])
+async def lms_transcript(user: CurrentUser, db: DbDep, lms: LmsDep) -> LmsTranscript:
+    student_id = await lms_link_service.require_student_id(db, user.id)
+    return await lms_link_service.sync_transcript(db, lms, user.id, student_id)
+
+
+@router.get("/lms/assignments", response_model=list[LmsAssignment], tags=["lms"])
+async def lms_assignments(user: CurrentUser, db: DbDep, lms: LmsDep) -> list[LmsAssignment]:
+    return await lms_link_service.list_assignments(db, lms, user.id)
+
+
+@router.post("/lms/assignments/{assignment_id}/submit", response_model=LmsSubmission, tags=["lms"])
+async def lms_submit_assignment(
+    assignment_id: Annotated[str, Path(pattern=r"^[0-9A-Za-z_-]{1,64}$")], user: CurrentUser, db: DbDep, lms: LmsDep
+) -> LmsSubmission:
+    return await lms_link_service.submit_assignment(db, lms, user.id, assignment_id)
+
+
+@router.get("/lms/materials", response_model=list[LmsMaterialSummary], tags=["lms"])
+async def lms_materials(user: CurrentUser, db: DbDep, lms: LmsDep) -> list[LmsMaterialSummary]:
+    return await lms_link_service.list_materials(db, lms, user.id)
+
+
+@router.post("/lms/materials/{material_id}/import", response_model=DocumentIngestResponse, tags=["lms"])
+async def lms_import_material(
+    material_id: Annotated[str, Path(pattern=r"^[0-9A-Za-z_-]{1,64}$")],
+    user: CurrentUser,
+    db: DbDep,
+    settings: SettingsDep,
+    lms: LmsDep,
+) -> DocumentIngestResponse:
+    """LMS 강의 자료를 도우미의 RAG 인덱스로 가져온다 (이미 가져왔으면 재사용)."""
+    return await lms_link_service.import_material(db, settings, lms, user.id, material_id)
+
+
+# ---------------- 커리어 나비게이터 ----------------
+@router.get("/career/tracks", response_model=list[CareerTrackItem], tags=["career"])
+async def career_tracks(_user: CurrentUser, db: DbDep) -> list[CareerTrackItem]:
+    tracks = await career_service.list_tracks(db)
+    return [CareerTrackItem(job_role=t.job_role, title=t.title, description=t.description) for t in tracks]
+
+
+@router.post("/career/target", response_model=CareerTrackItem, tags=["career"])
+async def career_set_target(body: CareerTargetRequest, user: CurrentUser, db: DbDep) -> CareerTrackItem:
+    track = await career_service.set_target_job(db, user.id, body.job_role)
+    return CareerTrackItem(job_role=track.job_role, title=track.title, description=track.description)
+
+
+@router.get("/career", response_model=CareerReport, tags=["career"])
+async def career_report(
+    user: CurrentUser,
+    db: DbDep,
+    lms: LmsDep,
+    agent: ApiAgentDep,
+    job_role: Annotated[str | None, Query(pattern=r"^[a-z_]{2,30}$", description="비우면 관심 직무")] = None,
+    with_ai: Annotated[bool, Query(description="AI 조언 포함 여부 (false면 계산 결과만)")] = True,
+) -> CareerReport:
+    """졸업 요건 분석 + 직무 트랙 추천. 계산은 파이썬, 조언은 AI (후보 과목 안에서만)."""
+    return await career_service.build_report(db, lms, user.id, agent if with_ai else None, job_role)

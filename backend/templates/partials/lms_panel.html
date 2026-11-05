@@ -1,0 +1,46 @@
+{# 🏫 가상 LMS 연동 패널: 연결 상태 · 이수 학점 · 미제출 과제 #}
+<section id="lms-panel" class="card">
+  <h2 class="card-title">🏫 가상 코스모스</h2>
+
+  {% if lms_error %}
+    <div class="alert danger small" role="alert">{{ lms_error }}</div>
+
+  {% elif lms_status and lms_status.linked %}
+    <p class="muted small">{{ lms_status.department }} · {{ lms_status.student_no }} · {{ lms_status.name }}</p>
+    <div class="lms-credits">
+      <div><p class="muted xsmall">이수 학점</p><p class="stat-value">{{ lms_status.completed_credits }}<small>학점</small></p></div>
+      <div><p class="muted xsmall">수강 중</p><p class="stat-value">{{ lms_status.in_progress_credits }}<small>학점</small></p></div>
+    </div>
+
+    <h3 class="list-title">📌 미제출 과제</h3>
+    {% if lms_assignments %}
+    <ul class="review-list">
+      {% for a in lms_assignments %}
+      <li>
+        <div class="review-text">
+          <p class="review-title">{{ a.title }}</p>
+          <p class="muted xsmall">
+            {{ a.course_name }} ·
+            {% if a.is_overdue %}<span class="text-danger">마감 지남</span>{% elif a.due_at %}마감 {{ a.due_at | kst }} ({{ a.due_at | relative_days }}){% else %}마감일 없음{% endif %}
+          </p>
+        </div>
+        <button type="button" class="btn outline sm"
+                hx-post="/ui/lms/assignments/{{ a.id }}/submit" hx-target="#lms-panel" hx-swap="outerHTML"
+                hx-confirm="‘{{ a.title }}’ 과제를 제출 완료로 표시할까요?">제출 완료</button>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted small">남은 과제가 없어요 🎉</p>
+    {% endif %}
+    {% if lms_status.synced_at %}<p class="muted xsmall">마지막 동기화 {{ lms_status.synced_at | kst }}</p>{% endif %}
+
+  {% else %}
+    <p class="muted small">가상 LMS 계정을 연결하면 성적표·과제·강의 자료를 AI가 함께 분석해요.</p>
+    <button type="button" class="btn primary block" hx-post="/ui/lms/link" hx-target="#lms-panel" hx-swap="outerHTML"
+            hx-disabled-elt="this" hx-indicator="#lms-loading">시연용 LMS 계정 연결</button>
+    <p id="lms-loading" class="htmx-indicator muted small"><span class="spinner"></span> LMS에서 성적표를 가져오는 중…</p>
+  {% endif %}
+</section>
+
+{% if oob_materials %}{% include "partials/lms_materials.html" %}{% include "partials/career_form.html" %}{% endif %}

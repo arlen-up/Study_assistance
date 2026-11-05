@@ -7,6 +7,7 @@ from pathlib import Path
 from fastapi.templating import Jinja2Templates
 
 from backend import __version__
+from backend.integrations.lms_client import CATEGORY_LABELS
 from backend.schemas.models import HeatmapDay
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
@@ -74,5 +75,6 @@ def build_heatmap(days: list[HeatmapDay]) -> list[HeatmapWeek]:
 
 templates.env.filters["kst"] = kst_datetime
 templates.env.filters["relative_days"] = relative_days
+templates.env.filters["category_label"] = lambda c: CATEGORY_LABELS.get(str(c), str(c))
 templates.env.globals["app_version"] = __version__
 templates.env.globals["build_heatmap"] = build_heatmap

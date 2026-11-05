@@ -25,13 +25,14 @@
   <div class="layout">
     <section class="tabs">
       {# 라디오 버튼 + CSS로 만든 탭: JS 없이 전환되고, 탭을 바꿔도 내용이 유지된다 #}
-      {% for key, label in [("chat", "💬 챗봇"), ("summary", "⏱ 3분 요약"), ("quiz", "🧠 퀴즈"), ("upload", "📤 교안 등록")] %}
+      {% for key, label in [("chat", "💬 챗봇"), ("summary", "⏱ 3분 요약"), ("quiz", "🧠 퀴즈"), ("career", "🧭 커리어"), ("upload", "📤 교안 등록")] %}
       <input class="tab-radio" type="radio" name="tab" id="tab-{{ key }}"{% if active_tab == key %} checked{% endif %}>
       {% endfor %}
       <nav class="tab-nav" aria-label="학습 도구">
         <label for="tab-chat">💬 <span class="hide-sm">챗봇</span></label>
         <label for="tab-summary">⏱ <span class="hide-sm">3분 요약</span></label>
         <label for="tab-quiz">🧠 <span class="hide-sm">퀴즈</span></label>
+        <label for="tab-career">🧭 <span class="hide-sm">커리어</span></label>
         <label for="tab-upload">📤 <span class="hide-sm">교안 등록</span></label>
       </nav>
 
@@ -90,17 +91,28 @@
           <div id="quiz-area"></div>
         </div>
 
+        {# ---------------- 커리어 나비게이터 ---------------- #}
+        <div class="tab-panel card" id="panel-career">
+          <h2 class="card-title">🧭 커리어 나비게이터</h2>
+          <p class="muted small">LMS 성적표와 관심 직무로 졸업까지 남은 요건과 다음 학기 추천 과목을 알려줘요</p>
+          {% include "partials/career_form.html" %}
+          <div id="career-result"></div>
+        </div>
+
         {# ---------------- 교안 등록 ---------------- #}
         <div class="tab-panel card" id="panel-upload">
           <h2 class="card-title">📤 교안 등록</h2>
           <p class="muted small">PDF·Markdown·HTML·TXT 파일 또는 텍스트를 올리면 검색할 수 있게 저장해요</p>
+          {% include "partials/lms_materials.html" %}
+          <hr class="divider">
           {% include "partials/upload_form.html" %}
           <div id="upload-result"></div>
         </div>
       </div>
     </section>
 
-    <aside>
+    <aside class="stack">
+      {% include "partials/lms_panel.html" %}
       {% if dashboard %}{% include "partials/reviews.html" %}{% endif %}
     </aside>
   </div>

@@ -1,0 +1,114 @@
+{% set g = report.analysis.graduation %}
+{% set t = report.analysis.track %}
+{% set state_labels = {"completed": "이수", "in_progress": "수강 중", "failed": "재수강 필요", "not_taken": "미수강"} %}
+{% set state_class = {"completed": "success", "in_progress": "secondary", "failed": "danger", "not_taken": "outline"} %}
+{% set total_pct = (g.completed_credits * 100 // g.total_required) if g.total_required else 100 %}
+{% set current_pct = (g.in_progress_credits * 100 // g.total_required) if g.total_required else 0 %}
+
+<div class="stack career">
+  {# ---------------- 졸업까지 ---------------- #}
+  <section class="career-hero">
+    <p class="muted small">{{ g.department }} · {{ g.student_name }}</p>
+    {% if g.graduation_ready %}
+      <h3 class="result-title">🎓 졸업 요건을 모두 채웠어요!</h3>
+    {% else %}
+      <h3 class="result-title">졸업까지 <span class="accent">{{ g.remaining_credits }}학점</span> 남았어요</h3>
+      <p class="muted small">
+        이번 학기 {{ g.in_progress_credits }}학점을 마치면 <strong>{{ g.remaining_after_current }}학점</strong>
+        · 한 학기 18학점 기준 약 <strong>{{ g.estimated_semesters_left }}학기</strong>
+      </p>
+    {% endif %}
+    <div class="progress big" role="img" aria-label="졸업 학점 {{ g.completed_credits }}/{{ g.total_required }}">
+      <span class="done" style="width: {{ [total_pct, 100] | min }}%"></span><span class="now" style="width: {{ [current_pct, 100 - total_pct] | min }}%"></span>
+    </div>
+    <p class="muted xsmall">이수 {{ g.completed_credits }} · 수강 중 {{ g.in_progress_credits }} / 졸업 {{ g.total_required }}학점</p>
+  </section>
+
+  {# ---------------- 이수 구분별 ---------------- #}
+  <section>
+    <h4 class="small-title">이수 구분별 진행</h4>
+    <div class="cat-list">
+      {% for c in g.categories %}
+      {% set done = (c.earned * 100 // c.required) if c.required else 100 %}
+      {% set now = (c.in_progress * 100 // c.required) if c.required else 0 %}
+      <div class="cat-row">
+        <span class="cat-label">{{ c.label }}</span>
+        <div class="progress"><span class="done" style="width: {{ [done, 100] | min }}%"></span><span class="now" style="width: {{ [now, 100 - ([done, 100] | min)] | min }}%"></span></div>
+        <span class="cat-num">{{ c.earned }}{% if c.in_progress %}<small>+{{ c.in_progress }}</small>{% endif %} / {{ c.required }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="muted xsmall">초록 = 이수, 연두 = 이번 학기 수강 중</p>
+  </section>
+
+  {# ---------------- 필수 과목 ---------------- #}
+  {% if g.retake_needed %}
+  <div class="alert danger">
+    <strong>⚠️ 재수강이 필요한 필수 과목</strong>:
+    {% for r in g.retake_needed %}{{ r.name }}({{ r.code }}){% if not loop.last %}, {% endif %}{% endfor %}
+  </div>
+  {% endif %}
+  {% if g.required_missing %}
+  <section>
+    <h4 class="small-title">아직 이수하지 않은 필수 과목 {{ g.required_missing | length }}개</h4>
+    <div class="tags">
+      {% for r in g.required_missing %}
+      <span class="badge {{ state_class[r.state] }}" title="{{ r.category | category_label }} · {{ r.credits }}학점">{{ r.name }} · {{ state_labels[r.state] }}</span>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {# ---------------- 직무 트랙 ---------------- #}
+  {% if t %}
+  <section class="track-card">
+    <div class="question-head">
+      <h4 class="small-title">💼 {{ t.title }} 트랙</h4>
+      <span class="badge secondary">핵심 과목 {{ t.core_completed }}/{{ t.core_total }} ({{ t.coverage_percent }}%)</span>
+    </div>
+    {% if t.description %}<p class="muted small">{{ t.description }}</p>{% endif %}
+    <p class="xsmall muted">핵심 과목</p>
+    <div class="tags">{% for r in t.core %}<span class="badge {{ state_class[r.state] }}">{{ r.name }} · {{ state_labels[r.state] }}</span>{% endfor %}</div>
+    {% if t.recommended %}
+    <p class="xsmall muted">추천 과목</p>
+    <div class="tags">{% for r in t.recommended %}<span class="badge {{ state_class[r.state] }}">{{ r.name }} · {{ state_labels[r.state] }}</span>{% endfor %}</div>
+    {% endif %}
+    <p class="xsmall muted">기술</p>
+    <div class="tags">
+      {% for s in t.matched_skills %}<span class="badge success">✓ {{ s }}</span>{% endfor %}
+      {% for s in t.missing_skills %}<span class="badge outline">{{ s }}</span>{% endfor %}
+    </div>
+  </section>
+  {% else %}
+  <div class="alert info">관심 직무를 고르면 직무별 핵심 과목과 기술 준비 상태도 함께 보여드려요.</div>
+  {% endif %}
+
+  {# ---------------- AI 조언 ---------------- #}
+  {% if report.advice %}
+  {% set a = report.advice %}
+  <section class="mini-summary big">
+    <h4 class="mini-summary-title">🤖 AI 커리어 조언</h4>
+    <p class="result-title">{{ a.headline }}</p>
+    <p class="pre">{{ a.summary }}</p>
+  </section>
+  <section>
+    <h4 class="small-title">📚 다음 학기 추천 과목 ({{ a.plan_credits }}학점)</h4>
+    {% include "partials/career_plan_table.html" %}
+  </section>
+  {% if a.skill_tips %}
+  <section>
+    <h4 class="small-title">🛠 수업 밖에서 준비하면 좋은 것</h4>
+    <ul class="points">{% for tip in a.skill_tips %}<li>{{ tip }}</li>{% endfor %}</ul>
+  </section>
+  {% endif %}
+  <p class="encourage">🦋 {{ a.encouragement }}</p>
+  <p class="muted xsmall">추천 과목은 위 계산 결과의 후보 안에서만 골랐어요 · {{ a.model_name }}</p>
+  {% else %}
+    {% if report.advice_error %}<div class="alert danger small">{{ report.advice_error }}</div>{% endif %}
+    <section>
+      <h4 class="small-title">📚 다음 학기 기본 추천 과목</h4>
+      {% set plan_rows = report.analysis.default_plan %}
+      {% include "partials/career_plan_table.html" %}
+    </section>
+  {% endif %}
+</div>

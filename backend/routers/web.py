@@ -11,15 +11,16 @@ import time
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, File, Form, Query, Request, UploadFile
+from fastapi import APIRouter, File, Form, Path, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from pydantic import TypeAdapter, ValidationError
 
 from backend.core.errors import AppError, BadRequestError
 from backend.core.supabase_client import DbDep, SettingsDep
-from backend.routers.deps import AgentDep
+from backend.integrations.lms_client import LmsClient, LmsDep
+from backend.routers.deps import WebAgentDep
 from backend.schemas.models import ChatRequest, ChatTurn, Difficulty, DocumentItem
-from backend.services import study_service
+from backend.services import career_service, lms_link_service, study_service
 from backend.web.session import (
     OptionalWebUser,
     WebUser,
@@ -29,6 +30,7 @@ from backend.web.session import (
     sign_up,
 )
 from backend.web.templating import templates
+from supabase import AsyncClient
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +39,7 @@ router = APIRouter(include_in_schema=False)
 MAX_HISTORY = 10
 MAX_TURN_CHARS = 4000
 _history_adapter = TypeAdapter(list[ChatTurn])
-TABS = ("chat", "summary", "quiz", "upload")
+TABS = ("chat", "summary", "quiz", "career", "upload")
 
 
 def _render(request: Request, name: str, context: dict[str, Any], status_code: int = 200) -> HTMLResponse:
@@ -120,6 +122,7 @@ async def dashboard_page(
     request: Request,
     user: WebUser,
     db: DbDep,
+    lms: LmsDep,
     tab: Annotated[str, Query()] = "chat",
     quiz_doc: Annotated[str | None, Query()] = None,
 ) -> HTMLResponse:
@@ -142,8 +145,45 @@ async def dashboard_page(
             "error": error,
             "active_tab": tab if tab in TABS else "chat",
             "quiz_doc": quiz_doc or "",
+            **await _lms_context(db, lms, user.id),
+            **await _career_context(db, user.id),
         },
     )
+
+
+async def _career_context(db: AsyncClient, user_id: UUID) -> dict[str, Any]:
+    try:
+        return {
+            "career_tracks": await career_service.list_tracks(db),
+            "target_job": await career_service.get_target_job(db, user_id),
+        }
+    except AppError:
+        return {"career_tracks": [], "target_job": None}
+
+
+async def _lms_context(db: AsyncClient, lms: LmsClient, user_id: UUID) -> dict[str, Any]:
+    """LMS 패널용 데이터. LMS 오류가 나도 대시보드 전체는 열리도록 메시지로만 전달한다."""
+    context: dict[str, Any] = {
+        "lms_status": None,
+        "lms_assignments": [],
+        "lms_materials": [],
+        "imported_ids": set(),
+        "lms_error": None,
+    }
+    try:
+        status = await lms_link_service.get_status(db, lms, user_id)
+        context["lms_status"] = status
+        if status.linked and status.student_id is not None:
+            context["lms_assignments"] = await lms.list_open_assignments(status.student_id)
+            context["lms_materials"] = await lms.list_student_materials(status.student_id)
+            context["imported_ids"] = await lms_link_service.imported_material_ids(db)
+    except AppError as exc:
+        context["lms_error"] = exc.message
+    return context
+
+
+def _render_lms_panel(request: Request, context: dict[str, Any]) -> HTMLResponse:
+    return _render(request, "partials/lms_panel.html", {**context, "oob_materials": True})
 
 
 # ---------------------------------------------------------------------
@@ -153,7 +193,7 @@ async def dashboard_page(
 async def ui_chat(
     request: Request,
     _user: WebUser,
-    agent: AgentDep,
+    agent: WebAgentDep,
     message: Annotated[str, Form(max_length=2000)],
     document_id: Annotated[str, Form()] = "",
     include_summary: Annotated[str | None, Form()] = None,
@@ -198,7 +238,7 @@ async def ui_chat(
 
 @router.post("/ui/summary", response_class=HTMLResponse)
 async def ui_summary(
-    request: Request, _user: WebUser, agent: AgentDep, document_id: Annotated[str, Form()] = ""
+    request: Request, _user: WebUser, agent: WebAgentDep, document_id: Annotated[str, Form()] = ""
 ) -> HTMLResponse:
     doc_id = _parse_uuid(document_id)
     if doc_id is None:
@@ -212,7 +252,7 @@ async def ui_quiz(
     request: Request,
     user: WebUser,
     db: DbDep,
-    agent: AgentDep,
+    agent: WebAgentDep,
     document_id: Annotated[str, Form()] = "",
     difficulty: Annotated[Difficulty, Form()] = "medium",
 ) -> HTMLResponse:
@@ -272,3 +312,61 @@ async def ui_upload(
     )
     documents = await study_service.list_documents(db)
     return _render(request, "partials/upload_result.html", {"result": result, "documents": documents, "oob": True})
+
+
+# ---------------------------------------------------------------------
+# 가상 LMS 연동 조각
+# ---------------------------------------------------------------------
+@router.post("/ui/lms/link", response_class=HTMLResponse)
+async def ui_lms_link(request: Request, user: WebUser, db: DbDep, lms: LmsDep) -> HTMLResponse:
+    await lms_link_service.link_demo_account(db, lms, user)
+    return _render_lms_panel(request, {**await _lms_context(db, lms, user.id), **await _career_context(db, user.id)})
+
+
+@router.post("/ui/lms/assignments/{assignment_id}/submit", response_class=HTMLResponse)
+async def ui_lms_submit(
+    request: Request,
+    assignment_id: Annotated[str, Path(pattern=r"^[0-9A-Za-z_-]{1,64}$")],
+    user: WebUser,
+    db: DbDep,
+    lms: LmsDep,
+) -> HTMLResponse:
+    await lms_link_service.submit_assignment(db, lms, user.id, assignment_id)
+    return _render_lms_panel(request, {**await _lms_context(db, lms, user.id), **await _career_context(db, user.id)})
+
+
+@router.post("/ui/lms/materials/{material_id}/import", response_class=HTMLResponse)
+async def ui_lms_import(
+    request: Request,
+    material_id: Annotated[str, Path(pattern=r"^[0-9A-Za-z_-]{1,64}$")],
+    user: WebUser,
+    db: DbDep,
+    settings: SettingsDep,
+    lms: LmsDep,
+) -> HTMLResponse:
+    result = await lms_link_service.import_material(db, settings, lms, user.id, material_id)
+    documents = await study_service.list_documents(db)
+    return _render(
+        request,
+        "partials/lms_import_result.html",
+        {"result": result, "material_id": str(material_id), "documents": documents},
+    )
+
+
+# ---------------------------------------------------------------------
+# 커리어 나비게이터 조각
+# ---------------------------------------------------------------------
+@router.post("/ui/career", response_class=HTMLResponse)
+async def ui_career(
+    request: Request,
+    user: WebUser,
+    db: DbDep,
+    lms: LmsDep,
+    agent: WebAgentDep,
+    job_role: Annotated[str, Form(pattern=r"^[a-z_]{0,30}$")] = "",
+) -> HTMLResponse:
+    """선택한 직무를 관심 직무로 저장하고, 졸업 요건 분석 + AI 조언을 보여준다."""
+    if job_role:
+        await career_service.set_target_job(db, user.id, job_role)
+    report = await career_service.build_report(db, lms, user.id, agent, job_role or None)
+    return _render(request, "partials/career_report.html", {"report": report})

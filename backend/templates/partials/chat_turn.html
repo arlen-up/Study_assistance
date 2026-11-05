@@ -12,7 +12,10 @@
     </div>
     {% endif %}
     {% set label = confidence_labels[result.confidence] %}
-    <span class="badge {{ label[1] }}">{{ label[0] }}</span>
+    <div class="tags">
+      <span class="badge {{ label[1] }}">{{ label[0] }}</span>
+      {% for name in result.lms_data %}<span class="badge outline">🏫 LMS {{ name }}</span>{% endfor %}
+    </div>
     {{ m.sources(result.sources) }}
     {{ m.tool_badges(result.tool_calls) }}
   </div>
