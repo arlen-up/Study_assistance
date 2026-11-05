@@ -6,13 +6,13 @@
   --text: #18181b;
   --muted: #71717a;
   --border: #e4e4e7;
-  --primary: #18181b;
-  --primary-text: #fafafa;
-  --accent: #059669;
-  --accent-soft: #ecfdf5;
-  --info-bg: #f0f9ff;
-  --info-border: #bae6fd;
-  --info-text: #0c4a6e;
+  --primary: #1d4ed8;
+  --primary-text: #ffffff;
+  --accent: #2563eb;
+  --accent-soft: #eff6ff;
+  --info-bg: #eff6ff;
+  --info-border: #bfdbfe;
+  --info-text: #1e3a8a;
   --danger: #dc2626;
   --danger-bg: #fef2f2;
   --warning-bg: #fef3c7;
@@ -126,6 +126,7 @@ h1, h2, h3, h4 { margin: 0; }
 .login-head { text-align: center; display: grid; gap: 4px; }
 .login-head h1 { font-size: 1.25rem; }
 .logo-mark { font-size: 2.2rem; }
+.logo-img { display: block; width: 72px; height: 72px; object-fit: contain; margin: 0 auto 8px; }
 
 /* ---------- 통계 ---------- */
 .stats { display: grid; gap: 12px; grid-template-columns: repeat(4, 1fr); }
