@@ -18,11 +18,6 @@
 
   {% if dashboard %}
     {% include "partials/due_banner.html" %}
-    {% include "partials/stats.html" %}
-    <div class="grass-row">
-      {% include "partials/heatmap.html" %}
-      {% include "partials/pet_card.html" %}
-    </div>
   {% endif %}
 
   <div class="layout">
@@ -171,5 +166,13 @@
       {% if dashboard %}{% include "partials/reviews.html" %}{% endif %}
     </aside>
   </div>
+
+  {% if dashboard %}
+    {% include "partials/stats.html" %}
+    <div class="grass-row">
+      {% include "partials/heatmap.html" %}
+      {% include "partials/pet_card.html" %}
+    </div>
+  {% endif %}
 </main>
 {% endblock %}
