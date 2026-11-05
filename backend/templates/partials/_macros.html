@@ -16,7 +16,7 @@
 
 {# ---------- 질문 종류 (Router) ---------- #}
 {% set route_labels = {"chat": ("💬", "일상 대화"), "study": ("📚", "학습 질문"), "info": ("🎓", "학적 정보")} %}
-{% set route_methods = {"llm": "AI가 분류", "rule": "규칙으로 분류", "button": "직접 선택"} %}
+{% set route_methods = {"llm": "AI가 분류", "rule": "규칙으로 분류", "button": "단추 기능"} %}
 
 {% macro route_badge(route) -%}
 {% if route %}

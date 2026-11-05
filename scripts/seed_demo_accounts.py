@@ -1,25 +1,27 @@
 """시연용 학생 계정 5개 만들기 (다시 실행해도 안전).
 
-계정마다 학년·수강 과목·이수 학점·관심 직무·학습 기록이 달라서,
-챗봇에 "졸업까지 몇 학점 남았어?", "이번 학기 시간표 알려줘"를 물으면 계정마다 다른 답이 나와요.
+계정마다 학년·수강 과목·이수 학점·과제(제출 여부)·관심 직무·학습 기록이 달라서,
+챗봇에 "졸업까지 몇 학점 남았어?", "남은 과제 알려줘"를 물으면 계정마다 다른 답이 나와요.
 
-| 계정 | 학년 (입학) | 이번 학기(2026-2) | 관심 직무 |
-|---|---|---|---|
-| lms-demo1@example.com | 1학년 (2026) | 자료구조·컴퓨터공학활용 등 | 프론트엔드 |
-| lms-demo2@example.com | 2학년 (2025) | 실제 e-class 시간표 6과목 | AI·데이터 |
-| lms-demo3@example.com | 2학년 (2025) | DB·네트워크·백엔드·자바 등 | 백엔드 |
-| lms-demo4@example.com | 3학년 (2024) | 웹 해킹·네트워크 보안 등 | 보안 |
-| lms-demo5@example.com | 4학년 (2023) | 캡스톤·재수강 (졸업 직전) | AI·데이터 |
+| 계정 | 학년 (입학) | 이번 학기(2026-2) | 남은 과제 | 관심 직무 |
+|---|---|---|---|---|
+| lms-demo1@example.com | 1학년 (2026) | 자료구조·컴퓨터공학활용 등 | 4개 (24시간 안 1개) | 프론트엔드 |
+| lms-demo2@example.com | 2학년 (2025) | 실제 e-class 시간표 6과목 | 4개 (24시간 안 3개, 가장 바쁨) | AI·데이터 |
+| lms-demo3@example.com | 2학년 (2025) | DB·네트워크·백엔드·자바 등 | 4개 (급한 것 없음) | 백엔드 |
+| lms-demo4@example.com | 3학년 (2024) | 웹 해킹·네트워크 보안 등 | 5개 (24시간 안 1개) | 보안 |
+| lms-demo5@example.com | 4학년 (2023) | 캡스톤·재수강 (졸업 직전) | 3개 (마감 지난 것 1개) | AI·데이터 |
 
 하는 일 (앱 서버 없이 Supabase REST + 서버용 비밀 키만 사용)
   1. Supabase 로그인 계정 만들기(이메일 인증 완료) — 이미 있으면 비밀번호만 새로 정함
   2. 가상 학교 시스템(lms_*)에 학생을 고정 학번(2026900001~5)으로 만들고, 수강 이력을 통째로 교체
+     + 과목별 과제를 만들거나 마감일을 '지금' 기준으로 다시 맞추고, 계정마다 제출한 과제를 다르게 넣음
   3. 도우미 users 행에 학교 계정 연결·이수 학점·관심 직무·펫 이름 저장
   4. 학습 기록(잔디·복습 일정)을 계정마다 다른 모양으로 새로 채움 (오늘은 비워 둠)
 
 실행
   python scripts/seed_demo_accounts.py                 # 비밀번호 무작위 (5개 계정 공통)
-  python scripts/seed_demo_accounts.py --password ...  # 비밀번호 직접 지정
+  python scripts/seed_demo_accounts.py --password ...  # 비밀번호 직접 지정 (Supabase 규칙상 6자 이상)
+  ※ 과제 마감일은 실행 시각 기준이라, 시연 직전에 한 번 더 실행하면 '24시간 안 마감'이 다시 맞춰져요.
 
 주의: 이 5개 계정·학생의 학습 기록, 수강 이력, 과제 제출 기록은 지우고 새로 채운다.
       다른 사용자·학생 데이터는 건드리지 않는다. 비밀번호는 화면에만 출력한다 (저장 안 함).
@@ -72,6 +74,47 @@ class StudyPattern:
 
 
 @dataclass(frozen=True)
+class Assignment:
+    course_code: str
+    title: str
+    due_in_hours: int            # 스크립트를 실행한 시각 기준 마감 (음수 = 이미 지남, 하루까지는 '지남'으로 보임)
+    description: str | None = None  # None = 이미 있는 과제 (마감일만 새로 맞춤)
+
+
+# 과제는 과목에 붙어 있어서, 같은 과목을 듣는 계정은 같은 과제를 받아요.
+# 계정마다 다른 건 ① 듣는 과목 ② 이미 제출한 과제(Profile.submitted)예요.
+ASSIGNMENTS: list[Assignment] = [
+    # e-class 시연 데이터(마이그레이션)로 이미 들어 있는 과제 — 마감일만 다시 맞춤
+    Assignment("CS202", "수강신청 시스템 ERD 설계", 20),
+    Assignment("CS204", "TCP 3-way handshake 정리", 52),
+    Assignment("CS204", "10주차.정리제출", 9),
+    Assignment("CS311", "FastAPI CRUD API 구현", 76),
+    Assignment("CS332", "XSS 취약점 분석 보고서", 100),
+    Assignment("GE301", "[AI] 김영란법 : 부정청탁방지법", 56),
+    Assignment("GE301", "[AI] 관인 청인 직인 특수관인 차이", 104),
+    # 이 스크립트가 새로 만드는 과제
+    Assignment("CS103", "명제와 진리표 연습문제", 30, "교재 2장 연습문제 1~10번을 풀고 진리표를 그려 제출하세요."),
+    Assignment("CS104", "CPU 파이프라인 단계 정리", 98, "5단계 파이프라인(IF·ID·EX·MEM·WB)과 해저드 종류를 한 쪽으로 정리하세요."),
+    Assignment("CS201", "연결 리스트 직접 구현하기", 16, "단일 연결 리스트의 삽입·삭제·탐색을 파이썬으로 구현하고 실행 결과를 첨부하세요."),
+    Assignment("SW111", "엑셀 함수로 성적표 만들기", 70, "SUM·AVERAGE·IF·VLOOKUP으로 가상 성적표를 만들어 제출하세요."),
+    Assignment("GE103", "나의 진로 로드맵 작성", 146, "졸업 후 3년까지의 목표와 학기별 준비 계획을 적어 제출하세요."),
+    Assignment("GE104", "영어 자기소개 스피치 녹음", 44, "1분 분량 영어 자기소개를 녹음해 올리세요."),
+    Assignment("CS203", "프로세스 스케줄링 비교 보고서", 118, "FCFS·SJF·RR을 같은 예제로 계산해 평균 대기 시간을 비교하세요."),
+    Assignment("GE202", "창업 아이템 1쪽 기획서", 166, "문제·고객·해결책·수익 모델을 한 쪽으로 정리하세요."),
+    Assignment("SW221", "pandas로 CSV 데이터 정리", 40, "결측치 처리와 그룹별 평균을 구하는 노트북 파일을 제출하세요."),
+    Assignment("SW231", "상속과 인터페이스 실습", 22, "Shape 인터페이스와 Circle·Rectangle 클래스를 구현하세요."),
+    Assignment("CS301", "요구사항 명세서(SRS) 작성", 74, "팀 프로젝트의 기능·비기능 요구사항을 SRS 양식으로 작성하세요."),
+    Assignment("CS333", "Wireshark 패킷 캡처 분석", 21, "실습 환경에서 캡처한 HTTP·DNS 패킷을 분석해 보고서로 제출하세요."),
+    Assignment("CS334", "디스크 이미지 타임라인 분석", 122, "제공된 실습용 디스크 이미지에서 파일 생성·삭제 타임라인을 만드세요."),
+    Assignment("GE203", "AI 윤리 사례 토론문", 94, "생성형 AI 저작권 사례 하나를 골라 찬반 근거를 정리하세요."),
+    Assignment("CS206", "fork·exec 실습 코드 제출", 14, "fork로 자식 프로세스를 만들고 exec로 ls를 실행하는 C 코드를 제출하세요."),
+    Assignment("CS324", "프롬프트 엔지니어링 실험 보고서", 68, "같은 질문을 프롬프트 3가지로 바꿔 물어보고 결과를 비교하세요."),
+    Assignment("CS390", "캡스톤 중간 발표 자료", 46, "진행 상황·시연 화면·남은 일정을 담은 발표 자료(10쪽 이내)를 올리세요."),
+    Assignment("CS390", "9주차 주간 진행 보고서", -6, "이번 주에 한 일·막힌 점·다음 주 계획을 적어 주세요."),
+]
+
+
+@dataclass(frozen=True)
 class Profile:
     no: int
     name: str
@@ -81,6 +124,7 @@ class Profile:
     history: list[H]
     pattern: StudyPattern
     note: str = ""
+    submitted: tuple[tuple[str, str], ...] = ()  # 이미 제출한 과제 (과목 코드, 과제 이름)
     student_no: str = field(init=False)
     email: str = field(init=False)
 
@@ -97,6 +141,7 @@ PROFILES: list[Profile] = [
     Profile(
         no=1, name="김새봄", admission_year=2026, target_job="frontend", pet_name="콩이",
         note="1학년 — 첫 학기를 마치고 전공 기초를 듣는 중",
+        submitted=(("SW111", "엑셀 함수로 성적표 만들기"), ("GE103", "나의 진로 로드맵 작성")),
         history=[
             *done("2026-1", "GE101:A0", "GE102:B+", "GE105:B0", "CS101:A+", "CS102:B+", "CS211:A0"),
             *taking("CS103", "CS104", "CS201", "SW111", "GE103", "GE104"),
@@ -106,6 +151,8 @@ PROFILES: list[Profile] = [
     Profile(
         no=2, name="이하늘", admission_year=2025, target_job="ai_data", pet_name="하루",
         note="2학년 — 실제 e-class 2026-2 시간표 6과목, 운영체제 재수강 필요",
+        submitted=(("CS204", "TCP 3-way handshake 정리"), ("SW111", "엑셀 함수로 성적표 만들기"),
+                   ("GE301", "[AI] 김영란법 : 부정청탁방지법"), ("GE301", "[AI] 관인 청인 직인 특수관인 차이")),
         history=[
             *done("2025-1", "GE101:A0", "GE102:B+", "GE105:B0", "CS101:A+", "CS102:B0", "CS103:C+", "CS211:B+"),
             *done("2025-2", "GE103:P", "GE104:B0", "CS104:B+", "CS201:A0", "CS212:C+", "CS203:F"),
@@ -117,6 +164,7 @@ PROFILES: list[Profile] = [
     Profile(
         no=3, name="박도윤", admission_year=2025, target_job="backend", pet_name="모모",
         note="2학년 — 백엔드 준비, 최근 이틀 공부를 쉬어 연속 기록이 끊김",
+        submitted=(("CS202", "수강신청 시스템 ERD 설계"), ("CS204", "10주차.정리제출"), ("SW231", "상속과 인터페이스 실습")),
         history=[
             *done("2025-1", "GE101:B0", "GE102:B0", "GE105:C+", "CS101:B+", "CS102:B0", "CS211:B0"),
             *done("2025-2", "GE103:P", "GE104:B+", "CS103:C0", "CS104:B0", "CS201:B+", "CS212:A0"),
@@ -128,6 +176,7 @@ PROFILES: list[Profile] = [
     Profile(
         no=4, name="최민서", admission_year=2024, target_job="security", pet_name="별이",
         note="3학년 — 보안 트랙, 운영체제는 재수강으로 이수",
+        submitted=(("SW221", "pandas로 CSV 데이터 정리"),),
         history=[
             *done("2024-1", "GE101:A0", "GE102:A0", "GE105:B+", "CS101:A0", "CS102:A+", "CS211:B+"),
             *done("2024-2", "GE103:P", "GE104:A0", "CS103:B0", "CS104:B+", "CS201:A0", "CS212:B+"),
@@ -141,6 +190,8 @@ PROFILES: list[Profile] = [
     Profile(
         no=5, name="정우진", admission_year=2023, target_job="ai_data", pet_name="뭉치",
         note="4학년 — 졸업 직전, 캡스톤 + 시스템 프로그래밍 재수강만 남음",
+        submitted=(("GE301", "[AI] 김영란법 : 부정청탁방지법"), ("GE301", "[AI] 관인 청인 직인 특수관인 차이"),
+                   ("CS324", "프롬프트 엔지니어링 실험 보고서")),
         history=[
             *done("2023-1", "GE101:B+", "GE102:B0", "GE105:A0", "CS101:A+", "CS102:A0", "CS211:A0"),
             *done("2023-2", "GE103:P", "GE104:B+", "CS103:B+", "CS104:A0", "CS201:A+", "CS212:A0"),
@@ -213,6 +264,44 @@ def replace_history(sb: httpx.Client, student_id: str, p: Profile, credits: dict
     # 시연 중 '제출 완료'를 눌렀던 과제도 다시 미제출로 (이 학생 것만)
     check(sb.delete("/rest/v1/lms_assignment_submissions", params={"student_id": f"eq.{student_id}"}),
           "과제 제출 기록 지우기")
+
+
+def sync_assignments(sb: httpx.Client, now: dt.datetime) -> dict[tuple[str, str], str]:
+    """과제를 만들거나(새 과제) 마감일만 다시 맞추고(기존 과제), (과목 코드, 과제 이름) → id 를 돌려준다."""
+    def due(a: Assignment) -> str:
+        return (now + dt.timedelta(hours=a.due_in_hours)).isoformat()
+
+    new = [{"course_code": a.course_code, "title": a.title, "description": a.description, "due_at": due(a)}
+           for a in ASSIGNMENTS if a.description is not None]
+    check(sb.post("/rest/v1/lms_assignments", params={"on_conflict": "course_code,title"}, json=new,
+                  headers={"Prefer": "resolution=merge-duplicates,return=minimal"}), "과제 만들기")
+    for a in ASSIGNMENTS:
+        if a.description is None:  # 이미 있는 과제: 설명·관련 자료는 그대로 두고 마감일만
+            res = check(sb.patch("/rest/v1/lms_assignments",
+                                 params={"course_code": f"eq.{a.course_code}", "title": f"eq.{a.title}"},
+                                 json={"due_at": due(a)}, headers={"Prefer": "return=representation"}),
+                        "과제 마감일 맞추기")
+            if not res.json():
+                sys.exit(f"❌ 과제가 없어요: {a.course_code} {a.title} (e-class 시연 데이터 SQL을 먼저 실행해 주세요)")
+    rows = check(sb.get("/rest/v1/lms_assignments", params={"select": "id,course_code,title"}), "과제 목록 조회").json()
+    return {(r["course_code"], r["title"]): r["id"] for r in rows}
+
+
+def submit_assignments(sb: httpx.Client, student_id: str, p: Profile, ids: dict[tuple[str, str], str],
+                       now: dt.datetime) -> None:
+    if not p.submitted:
+        return
+    rows = [{"student_id": student_id, "assignment_id": ids[key],
+             "submitted_at": (now - dt.timedelta(hours=6 + 11 * i)).isoformat()}
+            for i, key in enumerate(p.submitted)]
+    check(sb.post("/rest/v1/lms_assignment_submissions", json=rows, headers={"Prefer": "return=minimal"}),
+          "과제 제출 기록 넣기")
+
+
+def open_assignments(sb: httpx.Client, student_id: str) -> list[dict]:
+    return check(sb.get("/rest/v1/lms_open_assignments",
+                        params={"student_id": f"eq.{student_id}", "select": "course_name,title,due_at,is_overdue",
+                                "order": "due_at.asc"}), "미제출 과제 조회").json()
 
 
 def credit_summary(sb: httpx.Client, student_id: str) -> dict[str, int]:
@@ -332,11 +421,19 @@ def main() -> None:
         total_required = int(grad[0]["total_credits"])
         jobs = {t["job_role"] for t in check(sb.get("/rest/v1/career_tracks", params={"select": "job_role"}),
                                               "직무 목록 조회").json()}
+        listed = {(a.course_code, a.title) for a in ASSIGNMENTS}
         for p in PROFILES:
             unknown = sorted({code for code, *_ in p.history} - credits.keys())
             if unknown or p.target_job not in jobs:
                 sys.exit(f"❌ {p.email}: 없는 과목 {unknown} 또는 없는 직무 {p.target_job}")
+            taking_now = {c for c, _, status, _ in p.history if status == "in_progress"}
+            bad = [key for key in p.submitted if key not in listed or key[0] not in taking_now]
+            if bad:
+                sys.exit(f"❌ {p.email}: 목록에 없거나 듣지 않는 과목의 과제 {bad}")
         pools = document_pools(sb, names)
+        now = dt.datetime.now(dt.UTC).replace(minute=0, second=0, microsecond=0) + dt.timedelta(hours=1)
+        assignment_ids = sync_assignments(sb, now)
+        print(f"▶ 과제 {len(ASSIGNMENTS)}개 준비 (마감일은 지금 기준으로 다시 맞춤)")
 
         summary = []
         for p in PROFILES:
@@ -349,6 +446,7 @@ def main() -> None:
             if others:
                 sys.exit(f"❌ 학번 {p.student_no}이 이미 다른 사용자와 연결돼 있어요. 건드리지 않고 멈춰요.")
             replace_history(sb, student_id, p, credits)
+            submit_assignments(sb, student_id, p, assignment_ids, now)
             earned = credit_summary(sb, student_id)
             completed = sum(earned.values())
             check(sb.patch("/rest/v1/users", params={"id": f"eq.{user_id}"}, json={
@@ -359,16 +457,22 @@ def main() -> None:
             count = seed_logs(sb, user_id, p, pools, today)
             in_progress = [code for code, _, status, _ in p.history if status == "in_progress"]
             no_docs = [names[c] for c in in_progress if c not in pools]
-            summary.append((p, completed, sum(credits[c] for c in in_progress), in_progress, count, no_docs))
-            print(f"  이수 {completed}학점 · 수강 중 {len(in_progress)}과목 · 학습 기록 {count}개")
+            todo = open_assignments(sb, student_id)
+            summary.append((p, completed, sum(credits[c] for c in in_progress), in_progress, count, no_docs, todo))
+            print(f"  이수 {completed}학점 · 수강 중 {len(in_progress)}과목 · 제출 {len(p.submitted)}개"
+                  f" · 남은 과제 {len(todo)}개 · 학습 기록 {count}개")
 
-    print(f"\n✅ 완료! 5개 계정 공통 비밀번호 (다시 실행하면 바뀌어요): {password}\n")
-    for p, completed, now, codes, count, no_docs in summary:
+    hint = "직접 정한 값" if args.password else "무작위 — 다시 실행하면 바뀌어요"
+    print(f"\n✅ 완료! 5개 계정 공통 비밀번호 ({hint}): {password}\n")
+    for p, completed, now_credits, codes, count, no_docs, todo in summary:
         streak = p.pattern.run_len if p.pattern.run_end == 1 else 0
         print(f"- {p.email}  {p.name} · {p.grade_year}학년({p.admission_year} 입학) · 관심 직무 {p.target_job}")
         print(f"    이수 {completed}학점 / 졸업 {total_required}학점 (남은 {max(total_required - completed, 0)}학점)"
-              f" · 이번 학기 {now}학점 · 연속 학습 {streak}일 · 학습 기록 {count}개")
+              f" · 이번 학기 {now_credits}학점 · 연속 학습 {streak}일 · 학습 기록 {count}개")
         print(f"    수강 중: {', '.join(names[c] for c in codes)}")
+        for a in todo:
+            due = dt.datetime.fromisoformat(a["due_at"]).astimezone(KST).strftime("%m/%d %H:%M")
+            print(f"    {'⚠ 지남' if a['is_overdue'] else '□ 과제'} {a['course_name']} — {a['title']} (마감 {due})")
         if no_docs:
             print(f"    (교안 없음: {', '.join(no_docs)})")
         if p.note:
