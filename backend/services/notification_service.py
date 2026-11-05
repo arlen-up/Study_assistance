@@ -165,16 +165,23 @@ async def run_daily(db: AsyncClient, settings: Settings, lms: LmsClient) -> Cron
 
     async def process(user_id: UUID) -> None:
         async with semaphore:
-            if time.monotonic() - started > TIME_BUDGET_SECONDS:
+            remaining = TIME_BUDGET_SECONDS - (time.monotonic() - started)
+            if remaining <= 0:
                 counts["skipped"] += 1
                 return
             try:
-                if user_id in linked:
-                    result = await lms_link_service.sync_user(db, settings, lms, user_id, max_imports=3)
-                    counts["synced"] += int(result.linked)
-                    counts["imported"] += len(result.imported_titles)
-                if user_id in subscribed:
-                    counts[await notify_user(db, settings, lms, user_id)] += 1
+                # 한 사람이 오래 걸려도 전체가 Vercel 제한 시간(60초)을 넘기지 않게 남은 시간만큼만 기다린다
+                async with asyncio.timeout(remaining):
+                    # 알림이 더 중요하므로 먼저 보내고, 자료 동기화는 그다음에 한다
+                    if user_id in subscribed:
+                        counts[await notify_user(db, settings, lms, user_id)] += 1
+                    if user_id in linked:
+                        result = await lms_link_service.sync_user(db, settings, lms, user_id, max_imports=3)
+                        counts["synced"] += int(result.linked)
+                        counts["imported"] += len(result.imported_titles)
+            except TimeoutError:
+                logger.warning("일일 처리 시간 초과 (남은 시간 %.1f초)", remaining)
+                counts["skipped"] += 1
             except Exception:
                 logger.exception("일일 처리 실패")
                 counts["failed"] += 1
