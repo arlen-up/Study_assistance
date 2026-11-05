@@ -1,7 +1,7 @@
 {
-  "name": "LMS 3분 학습 도우미",
-  "short_name": "3분 학습",
-  "description": "코스모스 연동 AI 학습·진로 도우미",
+  "name": "Study Overflow",
+  "short_name": "Study Overflow",
+  "description": "미루는 습관, 파편화된 학사 정보, 그리고 단기 기억에 머무는 학습 해결",
   "lang": "ko",
   "start_url": "/",
   "scope": "/",

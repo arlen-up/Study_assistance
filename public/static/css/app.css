@@ -1,4 +1,4 @@
-/* LMS 3분 학습 도우미 — 빌드 도구 없이 쓰는 순수 CSS */
+/* Study Overflow — 빌드 도구 없이 쓰는 순수 CSS */
 
 :root {
   --bg: #f6f7f9;
@@ -64,6 +64,8 @@ h1, h2, h3, h4 { margin: 0; }
 .topbar-right { display: flex; gap: 10px; align-items: center; margin-left: auto; }
 .brand { font-weight: 800; font-size: 1rem; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
 .brand-logo { width: 32px; height: 32px; object-fit: contain; }
+.brand-name { display: grid; gap: 1px; line-height: 1.2; }
+.brand-tagline { font-size: .7rem; font-weight: 500; color: var(--muted); white-space: normal; word-break: keep-all; }
 .main-nav { display: flex; gap: 4px; background: #f4f4f5; border-radius: 12px; padding: 4px; }
 .main-nav label { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 9px; font-size: .9rem; font-weight: 700; color: var(--muted); cursor: pointer; white-space: nowrap; }
 .main-nav label:hover { color: var(--text); background: #fff; }
@@ -161,6 +163,7 @@ h1, h2, h3, h4 { margin: 0; }
 .login-card { width: 100%; max-width: 380px; display: grid; gap: 16px; }
 .login-head { text-align: center; display: grid; gap: 4px; }
 .login-head h1 { font-size: 1.25rem; }
+.login-head .tagline { font-size: .8rem; color: var(--muted); line-height: 1.45; margin-bottom: 6px; word-break: keep-all; text-wrap: balance; }
 .logo-mark { font-size: 2.2rem; }
 .logo-img { display: block; width: 72px; height: 72px; object-fit: contain; margin: 0 auto 8px; }
 
