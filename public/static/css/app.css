@@ -485,3 +485,11 @@ mark.hl { background: var(--hl); color: inherit; border-radius: 3px; padding: 1p
 .diagram-view { min-height: 420px; }
 .diagram-body { font-size: 1rem; line-height: 1.7; }
 .diagram-body pre.mermaid { min-height: 340px; overflow: auto; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+
+/* ---------- 퀴즈·카드 슬라이드: 한 번에 한 장 ---------- */
+.slide-radio { position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; }
+.slide-card { display: none; }
+.slide-radio:checked + .slide-card { display: block; }
+.slide-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.slide-progress { margin-bottom: 4px; }
+.quiz-explain { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }

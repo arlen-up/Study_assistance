@@ -27,6 +27,7 @@ from backend.services import (
     file_store,
     insights_service,
     lms_link_service,
+    quiz_service,
     study_service,
     viewer_service,
 )
@@ -323,6 +324,110 @@ async def ui_chat_quiz(
     elapsed = round((time.perf_counter() - started) * 1000)
     return _render(
         request, "partials/chat_quiz.html", {"quiz": quiz, "started_at": int(time.time()), "answer_ms": elapsed}
+    )
+
+
+MAX_QUIZ_QUESTIONS = 10
+
+
+def _parse_answers(raw: str) -> list[str]:
+    """화면이 들고 다니는 지금까지의 답안 목록(JSON)을 검사한다."""
+    try:
+        data = json.loads(raw or "[]")
+    except json.JSONDecodeError:
+        raise BadRequestError("답안 정보를 다시 불러와 주세요.") from None
+    if not isinstance(data, list) or len(data) > MAX_QUIZ_QUESTIONS or not all(isinstance(a, str) for a in data):
+        raise BadRequestError("답안 정보를 다시 불러와 주세요.")
+    return [a.strip()[:500] for a in data]
+
+
+def _quiz_step_context(quiz_id: UUID, index: int, total: int, answers: list[str], started_at: str) -> dict[str, Any]:
+    return {
+        "quiz_id": quiz_id,
+        "index": index,
+        "total": total,
+        "answers_json": json.dumps(answers, ensure_ascii=False),
+        "started_at": _safe_int(started_at),
+    }
+
+
+@router.post("/ui/quiz/{quiz_id}/slide", response_class=HTMLResponse)
+async def ui_quiz_slide(
+    request: Request,
+    quiz_id: UUID,
+    user: WebUser,
+    db: DbDep,
+    index: Annotated[int, Form(ge=0, le=MAX_QUIZ_QUESTIONS - 1)],
+    answers_json: Annotated[str, Form()] = "[]",
+    started_at: Annotated[str, Form()] = "0",
+) -> HTMLResponse:
+    """슬라이드 한 장(문제 한 개)을 보여 준다. 앞 문제를 모두 채점했을 때만 다음 문제를 연다."""
+    _, questions = await quiz_service.load_quiz(db, quiz_id=quiz_id, user_id=user.id)
+    answers = _parse_answers(answers_json)
+    if index >= len(questions) or len(answers) != index:
+        raise BadRequestError("이전 문제부터 차례로 풀어 주세요.")
+    return _render(
+        request,
+        "partials/quiz_slide.html",
+        {"q": questions[index], **_quiz_step_context(quiz_id, index, len(questions), answers, started_at)},
+    )
+
+
+@router.post("/ui/quiz/{quiz_id}/check", response_class=HTMLResponse)
+async def ui_quiz_check(
+    request: Request,
+    quiz_id: UUID,
+    user: WebUser,
+    db: DbDep,
+    index: Annotated[int, Form(ge=0, le=MAX_QUIZ_QUESTIONS - 1)],
+    answer: Annotated[str, Form(max_length=500)],
+    answers_json: Annotated[str, Form()] = "[]",
+    started_at: Annotated[str, Form()] = "0",
+) -> HTMLResponse:
+    """이 문제 하나만 바로 채점해서 정답과 해설을 보여 준다. 결과는 아직 저장하지 않는다."""
+    _, questions = await quiz_service.load_quiz(db, quiz_id=quiz_id, user_id=user.id)
+    answers = _parse_answers(answers_json)
+    if index >= len(questions) or len(answers) != index:
+        raise BadRequestError("이전 문제부터 차례로 풀어 주세요.")
+    value = answer.strip()
+    if not value:
+        raise BadRequestError("답을 입력한 뒤 확인해 주세요.")
+    question = questions[index]
+    answers.append(value)
+    total = len(questions)
+    return _render(
+        request,
+        "partials/quiz_checked.html",
+        {
+            "q": question,
+            "correct": quiz_service.is_correct(question, value),
+            "your_answer": value,
+            "is_last": index + 1 >= total,
+            **_quiz_step_context(quiz_id, index, total, answers, started_at),
+        },
+    )
+
+
+@router.post("/ui/quiz/{quiz_id}/finish", response_class=HTMLResponse)
+async def ui_quiz_finish(
+    request: Request,
+    quiz_id: UUID,
+    user: WebUser,
+    db: DbDep,
+    answers_json: Annotated[str, Form()] = "[]",
+    started_at: Annotated[str, Form()] = "0",
+) -> HTMLResponse:
+    """모든 문제를 채점해 학습 기록을 남기고, 카드 결과(한 장씩)를 보여 준다."""
+    answers = _parse_answers(answers_json)
+    started = _safe_int(started_at)
+    duration = max(0, min(int(time.time()) - started, 86_400)) if started else None
+    result, questions = await study_service.submit_quiz(db, user.id, quiz_id, answers, duration)
+    dashboard = await study_service.get_dashboard(db, user.id)
+    return _render(
+        request,
+        "partials/quiz_result.html",
+        {"result": result, "questions": questions, "dashboard": dashboard, "oob": True,
+         **await _insights_context(db, user.id, dashboard)},
     )
 
 
