@@ -1,0 +1,44 @@
+{
+  "description": "LSSA 챗봇 AI 평가 세트. 시연 계정 lms-demo2(이하늘, 2학년, 실제 e-class 2026-2 시간표)의 교안 13개와 학교 데이터 기준. 기대값은 사람이 미리 정한 정답.",
+  "account": "lms-demo2@example.com",
+  "categories": {
+    "chat": "일상 대화 — 도구·근거 표시 없이 바로 대답해야 함",
+    "study": "교안에 있는 학습 질문 — 맞는 교안을 [n]으로 인용하고 근거가 충분해야 함",
+    "study_out": "교안에 없는 학습 질문 — 지어내지 않고 '근거 부족'으로 표시해야 함",
+    "info": "학적 정보 — 학교 시스템 데이터로 정확한 사실을 답해야 함"
+  },
+  "items": [
+    {"id": "chat-01", "category": "chat", "question": "안녕! 오늘 좀 피곤하다"},
+    {"id": "chat-02", "category": "chat", "question": "고마워 덕분에 살았어"},
+    {"id": "chat-03", "category": "chat", "question": "너는 누구야?"},
+    {"id": "chat-04", "category": "chat", "question": "시험 기간이라 너무 스트레스 받아"},
+    {"id": "chat-05", "category": "chat", "question": "공부 집중 잘 되는 음악 장르 추천해줘"},
+    {"id": "chat-06", "category": "chat", "question": "ㅋㅋ 오늘 학식 맛있었어"},
+
+    {"id": "study-01", "category": "study", "question": "자바에서 예외처리는 어떻게 해?", "expect_source": "예외와 예외처리"},
+    {"id": "study-02", "category": "study", "question": "추상클래스랑 인터페이스 차이가 뭐야?", "expect_source": "추상클래스와 인터페이스"},
+    {"id": "study-03", "category": "study", "question": "자바에서 쓰레드를 만드는 방법 알려줘", "expect_source": "쓰레드"},
+    {"id": "study-04", "category": "study", "question": "저번주 자바 내용 알려줘", "expect_source": "예외와 예외처리", "note": "11/6은 10주차 → 저번주 9주차 자바 자료가 없으므로 가장 가까운 8주차"},
+    {"id": "study-05", "category": "study", "question": "정규화가 뭐고 ERD는 왜 그려?", "expect_source": "정규화와 ERD"},
+    {"id": "study-06", "category": "study", "question": "통신 프로토콜의 구성 요소가 뭐야?", "expect_source": "통신 프로토콜"},
+    {"id": "study-07", "category": "study", "question": "LAN이 뭔지 설명해줘", "expect_source": "근거리통신망"},
+    {"id": "study-08", "category": "study", "question": "Git으로 포트폴리오 프로젝트를 관리하는 방법 알려줘", "expect_source": "Git"},
+    {"id": "study-09", "category": "study", "question": "보고서에 쓰는 개조식 문장은 어떻게 써?", "expect_source": "개조식"},
+    {"id": "study-10", "category": "study", "question": "파이썬으로 웹 데이터 수집하는 방법 알려줘", "expect_source": "데이터 수집"},
+
+    {"id": "out-01", "category": "study_out", "question": "쿠버네티스에서 파드가 노드에 스케줄링되는 원리를 설명해줘"},
+    {"id": "out-02", "category": "study_out", "question": "양자컴퓨터의 큐비트 얽힘을 설명해줘"},
+    {"id": "out-03", "category": "study_out", "question": "리액트 useEffect의 의존성 배열은 어떻게 동작해?"},
+    {"id": "out-04", "category": "study_out", "question": "블록체인의 지분증명(PoS) 합의 방식 설명해줘"},
+    {"id": "out-05", "category": "study_out", "question": "머신러닝에서 경사하강법의 학습률은 어떻게 정해?"},
+
+    {"id": "info-01", "category": "info", "question": "졸업까지 몇 학점 남았어?", "expect_all": ["65"]},
+    {"id": "info-02", "category": "info", "question": "지금까지 이수한 학점이 총 몇 학점이야?", "expect_all": ["45"]},
+    {"id": "info-03", "category": "info", "question": "졸업하려면 총 몇 학점이 필요해?", "expect_all": ["110"]},
+    {"id": "info-04", "category": "info", "question": "이번 학기에 듣는 과목 알려줘", "expect_all": ["자바프로그래밍실무", "정보통신개론"]},
+    {"id": "info-05", "category": "info", "question": "아직 안 낸 과제 뭐 있어?", "expect_any": ["ERD", "10주차", "상속", "pandas"]},
+    {"id": "info-06", "category": "info", "question": "운영체제 다시 들어야 해?", "expect_all": ["운영체제"]},
+    {"id": "info-07", "category": "info", "question": "AI·데이터 직무로 가려면 다음 학기에 뭐 들으면 좋아?", "expect_tool": "career_analyze"},
+    {"id": "info-08", "category": "info", "question": "내 성적표 보여줘", "expect_any": ["A+", "A0", "B+", "B0"]}
+  ]
+}

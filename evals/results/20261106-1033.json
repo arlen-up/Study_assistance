@@ -1,0 +1,688 @@
+{
+  "meta": {
+    "started": "2026-11-06 10:33 KST",
+    "model": "gpt-6-luna",
+    "embedding": "text-embedding-3-small",
+    "account": "lms-demo2@example.com"
+  },
+  "results": [
+    {
+      "id": "chat-01",
+      "category": "chat",
+      "question": "안녕! 오늘 좀 피곤하다",
+      "route": "chat",
+      "route_method": "llm",
+      "evidence": null,
+      "cited_titles": [],
+      "tools": [],
+      "lms_sources": [],
+      "answer": "안녕하세요! 오늘 많이 지치셨나 봐요. 잠깐 물 마시고 가볍게 쉬어도 괜찮아요. 공부 때문에 피곤하신 거라면 부담 없이 같이 정리해 드릴게요.",
+      "ms": 3706,
+      "checks": {
+        "분류": true,
+        "근거 표시 없음": true,
+        "도구 안 씀": true
+      },
+      "passed": true
+    },
+    {
+      "id": "chat-02",
+      "category": "chat",
+      "question": "고마워 덕분에 살았어",
+      "route": "chat",
+      "route_method": "llm",
+      "evidence": null,
+      "cited_titles": [],
+      "tools": [],
+      "lms_sources": [],
+      "answer": "도움이 됐다니 다행이에요! 😊 공부하다 막히거나 정리할 게 생기면 언제든 편하게 물어봐 주세요.",
+      "ms": 3920,
+      "checks": {
+        "분류": true,
+        "근거 표시 없음": true,
+        "도구 안 씀": true
+      },
+      "passed": true
+    },
+    {
+      "id": "chat-03",
+      "category": "chat",
+      "question": "너는 누구야?",
+      "route": "chat",
+      "route_method": "llm",
+      "evidence": null,
+      "cited_titles": [],
+      "tools": [],
+      "lms_sources": [],
+      "answer": "저는 IT 전공 공부를 돕는 LSSA 학습 도우미예요. 교안 내용을 쉽게 설명하고, 수업 요약이나 퀴즈를 만들거나 학점·졸업 요건 확인을 도와드릴 수 있어요. 공부 관련해서 궁금한 점이 있으면 편하게 물어보세요!",
+      "ms": 4056,
+      "checks": {
+        "분류": true,
+        "근거 표시 없음": true,
+        "도구 안 씀": true
+      },
+      "passed": true
+    },
+    {
+      "id": "chat-04",
+      "category": "chat",
+      "question": "시험 기간이라 너무 스트레스 받아",
+      "route": "chat",
+      "route_method": "llm",
+      "evidence": null,
+      "cited_titles": [],
+      "tools": [],
+      "lms_sources": [],
+      "answer": "시험 기간엔 할 게 한꺼번에 몰려서 정말 벅찰 수 있어요. 잠깐 어깨 힘을 풀고, 지금 해야 할 일 중 가장 작은 것 하나만 골라 10분만 해보는 건 어떨까요? 원하시면 과목별로 할 일을 나눠서 오늘 계획을 같이 세워드릴게요.",
+      "ms": 3431,
+      "checks": {
+        "분류": true,
+        "근거 표시 없음": true,
+        "도구 안 씀": true
+      },
+      "passed": true
+    },
+    {
+      "id": "chat-05",
+      "category": "chat",
+      "question": "공부 집중 잘 되는 음악 장르 추천해줘",
+      "route": "chat",
+      "route_method": "llm",
+      "evidence": null,
+      "cited_titles": [],
+      "tools": [],
+      "lms_sources": [],
+      "answer": "가사에 신경 쓰이지 않는 **로파이 힙합**, **잔잔한 재즈**, **앰비언트·클래식 음악**을 추천해요. 글 읽거나 암기할 땐 단순하고 반복적인 음악이, 코딩이나 과제할 땐 적당한 리듬이 있는 음악이 잘 맞을 수 있어요. 몇 가지를 짧게 들어보고 가장 덜 거슬리는 장르로 골라 보세요!",
+      "ms": 4014,
+      "checks": {
+        "분류": true,
+        "근거 표시 없음": true,
+        "도구 안 씀": true
+      },
+      "passed": true
+    },
+    {
+      "id": "chat-06",
+      "category": "chat",
+      "question": "ㅋㅋ 오늘 학식 맛있었어",
+      "route": "chat",
+      "route_method": "rule",
+      "evidence": null,
+      "cited_titles": [],
+      "tools": [],
+      "lms_sources": [],
+      "answer": "오, 맛있게 먹었다니 다행이에요 ㅋㅋ 오늘은 뭐가 제일 맛있었어요?",
+      "ms": 1449,
+      "checks": {
+        "분류": true,
+        "근거 표시 없음": true,
+        "도구 안 씀": true
+      },
+      "passed": true
+    },
+    {
+      "id": "study-01",
+      "category": "study",
+      "question": "자바에서 예외처리는 어떻게 해?",
+      "expect_source": "예외와 예외처리",
+      "route": "study",
+      "route_method": "llm",
+      "evidence": "high",
+      "cited_titles": [
+        "[자바프로그래밍실무] 8주차 예외와 예외처리"
+      ],
+      "tools": [
+        "find_course_materials",
+        "query_vector_db"
+      ],
+      "lms_sources": [],
+      "answer": "### 자바 예외 처리란?\n\n예외 처리는 프로그램 실행 중 문제가 생겼을 때, 프로그램이 갑자기 종료되지 않도록 상황을 처리하는 방법이에요. 자바에서는 보통 `try`와 `catch`를 사용합니다.[1]\n\n```java\ntry {\n    int result = 10 / 0; // 예외 발생\n} catch (ArithmeticException e) {\n    System.out.println(\"0으로 나눌 수 없어요.\");\n} finally {\n    System.out.println(\"마무리 작업\");\n}\n```\n\n- **`try`**: 예외가 발생할 수 있는 코드를 넣어요.\n- **`catch`**: 발생한 예외를 잡아서 처리해요.\n- **`finally`**: 예외 발생 여부와 관계없이 실행되는 마무리 ",
+      "ms": 13441,
+      "checks": {
+        "분류": true,
+        "맞는 교안 인용": true,
+        "근거 충분·일부": true
+      },
+      "passed": true
+    },
+    {
+      "id": "study-02",
+      "category": "study",
+      "question": "추상클래스랑 인터페이스 차이가 뭐야?",
+      "expect_source": "추상클래스와 인터페이스",
+      "route": "study",
+      "route_method": "llm",
+      "evidence": "high",
+      "cited_titles": [
+        "[자바프로그래밍실무] 5주차 추상클래스와 인터페이스"
+      ],
+      "tools": [
+        "query_vector_db"
+      ],
+      "lms_sources": [],
+      "answer": "### 핵심 차이\n\n둘 다 **직접 객체를 만들 수 없고**, 다른 클래스가 이어받거나 구현해 사용한다는 공통점이 있어요. 다만 목적이 달라요.\n\n| 구분 | 추상 클래스 | 인터페이스 |\n|---|---|---|\n| 목적 | 비슷한 클래스들의 **공통 코드와 상태**를 모아 재사용 | 클래스가 제공해야 할 **기능의 약속**을 정함 |\n| 사용 방식 | `extends`로 상속 | `implements`로 구현 |\n| 클래스와의 관계 | 보통 공통된 바탕이 되는 **“~의 한 종류(is-a)”** | **“~할 수 있다(can-do)”**는 기능 |\n| 개수 | 클래스는 보통 하나의 클래스만 상속 가능 | 한 클래스가 여러 인터페이스를 구현 가능 |\n\n예를 들어, `강아지`와 `고양이`가 공통으로 가진 이",
+      "ms": 6814,
+      "checks": {
+        "분류": true,
+        "맞는 교안 인용": true,
+        "근거 충분·일부": true
+      },
+      "passed": true
+    },
+    {
+      "id": "study-03",
+      "category": "study",
+      "question": "자바에서 쓰레드를 만드는 방법 알려줘",
+      "expect_source": "쓰레드",
+      "route": "study",
+      "route_method": "llm",
+      "evidence": "high",
+      "cited_titles": [
+        "[자바프로그래밍실무] 11주차 쓰레드의 개념과 생성"
+      ],
+      "tools": [
+        "find_course_materials",
+        "fetch_lms_document"
+      ],
+      "lms_sources": [],
+      "answer": "### 자바에서 쓰레드 만드는 방법\n\n자바에서는 주로 **두 가지 방법**으로 쓰레드를 만듭니다. 하나는 `Thread` 클래스를 상속하는 방법이고, 다른 하나는 `Runnable`을 구현하는 방법입니다. [1]\n\n**1. `Thread` 클래스 상속하기**\n\n```java\nclass MyThread extends Thread {\n    @Override\n    public void run() {\n        System.out.println(\"새 쓰레드에서 실행\");\n    }\n}\n\npublic class Main {\n    public static void main(String[] args) {\n        MyThread thread = new MyThread();\n        thread.sta",
+      "ms": 7712,
+      "checks": {
+        "분류": true,
+        "맞는 교안 인용": true,
+        "근거 충분·일부": true
+      },
+      "passed": true
+    },
+    {
+      "id": "study-04",
+      "category": "study",
+      "question": "저번주 자바 내용 알려줘",
+      "expect_source": "예외와 예외처리",
+      "note": "11/6은 10주차 → 저번주 9주차 자바 자료가 없으므로 가장 가까운 8주차",
+      "route": "study",
+      "route_method": "llm",
+      "evidence": "high",
+      "cited_titles": [
+        "[자바프로그래밍실무] 8주차 예외와 예외처리"
+      ],
+      "tools": [
+        "find_course_materials"
+      ],
+      "lms_sources": [],
+      "answer": "9주차 교안은 없어서, **가장 가까운 이전 자료인 8주차** 내용을 대신 정리해 드릴게요. [1]\n\n### 8주차: 예외와 예외 처리\n- **예외(Exception)**는 프로그램 실행 중 발생하는 오류 상황입니다. [1]\n- `try` 블록에서 예외가 발생하면 `catch` 블록이 처리하고, `finally` 블록은 예외 발생 여부와 관계없이 실행됩니다. [1]\n- **일반 예외(checked)**는 컴파일러가 처리를 요구하지만, **실행 예외(RuntimeException)**는 처리를 강제하지 않습니다. [1]\n- `throws`를 사용하면 예외 처리를 호출한 메서드에 넘길 수 있습니다. `Exception`을 상속해 사용자 정의 예외도 만들 수 있습니다. [1]\n\n```java\ntry {\n    /",
+      "ms": 5025,
+      "checks": {
+        "분류": true,
+        "맞는 교안 인용": true,
+        "근거 충분·일부": true
+      },
+      "passed": true
+    },
+    {
+      "id": "study-05",
+      "category": "study",
+      "question": "정규화가 뭐고 ERD는 왜 그려?",
+      "expect_source": "정규화와 ERD",
+      "route": "study",
+      "route_method": "llm",
+      "evidence": "high",
+      "cited_titles": [
+        "[데이터베이스] 9주차 정규화와 ERD"
+      ],
+      "tools": [
+        "query_vector_db"
+      ],
+      "lms_sources": [],
+      "answer": "### 정규화란?\n\n**정규화**는 데이터베이스에 같은 정보를 불필요하게 반복 저장하지 않도록 테이블을 나누고 정리하는 과정이에요. 중복을 줄이면 데이터를 추가·수정·삭제할 때 생기는 실수나 모순(이상 현상)도 줄일 수 있어요. [1]\n\n예를 들어 학생 이름을 수강 과목마다 반복해서 적으면, 이름이 바뀔 때 여러 행을 고쳐야 하죠. 정규화는 이런 반복을 줄이도록 데이터를 나누는 방법이에요.\n\n### ERD는 왜 그릴까요?\n\n**ERD**는 데이터베이스에 어떤 **대상(엔터티)**과 **정보(속성)**가 필요한지, 대상끼리 어떤 **관계**인지 그림으로 정리한 설계도예요. 관계가 1:1, 1:N, N:M 중 어떤 형태인지 확인하는 데도 도움이 되고, 특히 N:M 관계는 연결 테이블로 표현할 수 있어요. [1]",
+      "ms": 5716,
+      "checks": {
+        "분류": true,
+        "맞는 교안 인용": true,
+        "근거 충분·일부": true
+      },
+      "passed": true
+    },
+    {
+      "id": "study-06",
+      "category": "study",
+      "question": "통신 프로토콜의 구성 요소가 뭐야?",
+      "expect_source": "통신 프로토콜",
+      "route": "study",
+      "route_method": "llm",
+      "evidence": "high",
+      "cited_titles": [
+        "[정보통신개론] 10주차 통신 프로토콜"
+      ],
+      "tools": [
+        "find_course_materials"
+      ],
+      "lms_sources": [],
+      "answer": "### 통신 프로토콜의 구성 요소\n\n통신 프로토콜은 장치끼리 데이터를 주고받을 때 따르는 **약속**이며, 보통 다음 3가지 요소로 구성됩니다.[1]\n\n- **구문(Syntax)**: 데이터의 형식과 구조\n- **의미(Semantics)**: 제어 정보가 무엇을 뜻하는지\n- **타이밍(Timing)**: 데이터를 어떤 속도와 순서로 주고받는지\n\n예를 들어, 두 사람이 대화할 때 **어떤 형식으로 말할지**, **말의 뜻이 무엇인지**, **언제 어떤 순서로 말할지**를 정하는 것과 비슷합니다.",
+      "ms": 4391,
+      "checks": {
+        "분류": true,
+        "맞는 교안 인용": true,
+        "근거 충분·일부": true
+      },
+      "passed": true
+    },
+    {
+      "id": "study-07",
+      "category": "study",
+      "question": "LAN이 뭔지 설명해줘",
+      "expect_source": "근거리통신망",
+      "route": "study",
+      "route_method": "llm",
+      "evidence": "high",
+      "cited_titles": [
+        "[정보통신개론] 11주차 근거리통신망(LAN)"
+      ],
+      "tools": [
+        "query_vector_db"
+      ],
+      "lms_sources": [],
+      "answer": "### LAN이란?\n\n**LAN**은 *Local Area Network*의 약자로, 집·사무실·건물·캠퍼스처럼 **가까운 범위의 기기들을 연결한 네트워크**예요. [1]\n\n- **유선 LAN**의 대표 기술: 이더넷\n- **무선 LAN**의 대표 기술: Wi‑Fi\n- 예를 들어 집에서 휴대폰, 노트북, 프린터가 공유기에 연결되어 서로 통신하는 것도 LAN의 한 예예요. [1]\n\n쉽게 말해, **한정된 가까운 공간 안에서 기기끼리 연결해 정보를 주고받는 네트워크**라고 생각하면 됩니다.",
+      "ms": 4887,
+      "checks": {
+        "분류": true,
+        "맞는 교안 인용": true,
+        "근거 충분·일부": true
+      },
+      "passed": true
+    },
+    {
+      "id": "study-08",
+      "category": "study",
+      "question": "Git으로 포트폴리오 프로젝트를 관리하는 방법 알려줘",
+      "expect_source": "Git",
+      "route": "study",
+      "route_method": "llm",
+      "evidence": "high",
+      "cited_titles": [
+        "[컴퓨터공학활용] 3주차 Git으로 포트폴리오 프로그램 관리하기"
+      ],
+      "tools": [
+        "find_course_materials",
+        "fetch_lms_document"
+      ],
+      "lms_sources": [],
+      "answer": "### 기본 흐름\n\nGit은 프로젝트 파일의 **변경 이력을 기록**하고, GitHub는 저장소를 온라인에 보관하거나 공유하는 서비스예요.[1]\n\n1. 프로젝트 폴더에서 Git 저장소를 만들어요.\n ```bash\n   git init\n   ```\n2. 기록할 파일을 변경 목록에 담아요.\n ```bash\n   git add .\n   ```\n3. 현재 변경사항을 설명과 함께 기록해요.\n ```bash\n   git commit -m \"포트폴리오 첫 화면 추가\"\n   ```\n4. GitHub 저장소에 연결한 뒤 업로드해요.\n ```bash\n   git remote add origin <GitHub 저장소 주소>\n   git push -u origin main\n   ```\n\n이후에는 작업할 때마다 `git add` ",
+      "ms": 7889,
+      "checks": {
+        "분류": true,
+        "맞는 교안 인용": true,
+        "근거 충분·일부": true
+      },
+      "passed": true
+    },
+    {
+      "id": "study-09",
+      "category": "study",
+      "question": "보고서에 쓰는 개조식 문장은 어떻게 써?",
+      "expect_source": "개조식",
+      "route": "study",
+      "route_method": "llm",
+      "evidence": "high",
+      "cited_titles": [
+        "[AI로 완성하는 비즈니스 문서] 4주차 보고서용 개조식 문장"
+      ],
+      "tools": [
+        "query_vector_db"
+      ],
+      "lms_sources": [],
+      "answer": "### 개조식 문장 쓰는 법\n\n개조식은 내용을 **짧은 항목으로 나눠 핵심만 전달하는 방식**이에요. 보고서나 공문서에서 자주 씁니다. [1]\n\n- **한 항목에는 한 가지 내용만** 담기\n- **중요한 내용부터** 쓰기\n- 문장 끝은 `~함`, `~임`, `~예정`처럼 간결하게 마무리하기\n- 숫자와 날짜는 `많이`, `조만간` 대신 **구체적으로** 적기 [1]\n\n**예시**\n\n- 서술식: 설문조사를 진행했고, 참여자 80명 중 62명이 만족한다고 답했다.\n- 개조식: 설문조사 실시\n - 참여자 80명 중 62명 만족 응답\n\n보고서에 넣을 때는 항목만 나열하기보다, **제목과 들여쓰기로 내용의 관계를 보여주면** 더 읽기 쉬워요.",
+      "ms": 5641,
+      "checks": {
+        "분류": true,
+        "맞는 교안 인용": true,
+        "근거 충분·일부": true
+      },
+      "passed": true
+    },
+    {
+      "id": "study-10",
+      "category": "study",
+      "question": "파이썬으로 웹 데이터 수집하는 방법 알려줘",
+      "expect_source": "데이터 수집",
+      "route": "study",
+      "route_method": "llm",
+      "evidence": "high",
+      "cited_titles": [
+        "[파이선프로그래밍실무] 8주차 데이터 수집",
+        "[파이선프로그래밍실무] 7주차 AI와 데이터 분석"
+      ],
+      "tools": [
+        "find_course_materials"
+      ],
+      "lms_sources": [],
+      "answer": "### 파이썬으로 웹 데이터 수집하기\n\n웹 데이터는 크게 **웹 API**에서 받거나 **웹 페이지**에서 가져올 수 있어요.\n\n#### 1. 웹 API 이용하기 — 보통 이 방법부터 추천해요\nAPI는 프로그램이 데이터를 주고받도록 만든 통로예요. 파이썬의 `requests`로 API를 호출하면 JSON 형태로 응답을 받는 경우가 많고, 이를 `pandas`의 DataFrame으로 바꿔 분석할 수 있어요. [1]\n\n```python\nimport requests\nimport pandas as pd\n\nurl = \"https://api.example.com/items\"\nresponse = requests.get(url, timeout=10)\nresponse.raise_for_status()  # 요청이 실패하면 ",
+      "ms": 6873,
+      "checks": {
+        "분류": true,
+        "맞는 교안 인용": true,
+        "근거 충분·일부": true
+      },
+      "passed": true
+    },
+    {
+      "id": "out-01",
+      "category": "study_out",
+      "question": "쿠버네티스에서 파드가 노드에 스케줄링되는 원리를 설명해줘",
+      "route": "study",
+      "route_method": "llm",
+      "evidence": "low",
+      "cited_titles": [],
+      "tools": [
+        "query_vector_db"
+      ],
+      "lms_sources": [],
+      "answer": "교안에서는 찾지 못했어요.\n\n### 파드 스케줄링 원리\n\n쿠버네티스에서 **스케줄러(kube-scheduler)** 는 아직 노드가 정해지지 않은 파드를 찾아, 조건에 맞는 노드를 골라 배정합니다. 보통 다음 순서로 진행돼요.\n\n1. **파드의 요구사항 확인** \n CPU·메모리 요청량, 노드 선택 조건, 어피니티·안티어피니티, 톨러레이션 같은 설정을 확인합니다.\n\n2. **조건에 맞지 않는 노드 제외** \n 파드의 자원을 제공할 수 없거나, 파드가 요구하는 노드 조건을 만족하지 못하는 노드는 후보에서 뺍니다.\n\n3. **후보 노드 중 가장 적절한 곳 선택** \n 남은 노드들의 자원 여유와 파드 간 배치 규칙 등을 고려해 점수를 매기고, 점수가 높은 노드를 선택합니다.\n\n4. **노드에 배정** \n 스케줄러",
+      "ms": 7762,
+      "checks": {
+        "분류": true,
+        "근거 부족 표시": true
+      },
+      "passed": true
+    },
+    {
+      "id": "out-02",
+      "category": "study_out",
+      "question": "양자컴퓨터의 큐비트 얽힘을 설명해줘",
+      "route": "study",
+      "route_method": "llm",
+      "evidence": "low",
+      "cited_titles": [],
+      "tools": [
+        "query_vector_db"
+      ],
+      "lms_sources": [],
+      "answer": "### 큐비트 얽힘이란?\n\n교안에서는 찾지 못했어요. 일반적인 설명으로는, **큐비트 얽힘**은 두 개 이상의 큐비트가 서로 강하게 연결되어 각 큐비트를 따로 설명할 수 없는 양자 상태를 말합니다.\n\n예를 들어 두 큐비트가 다음과 같은 상태라고 해볼게요.\n\n```text\n(|00⟩ + |11⟩) / √2\n```\n\n측정하기 전에는 `00`과 `11` 중 어느 결과가 나올지 정해져 있지 않지만, 첫 번째 큐비트를 측정해 `0`을 얻으면 두 번째도 `0`, `1`을 얻으면 두 번째도 `1`로 나옵니다. 두 결과가 강하게 연관된 것이 얽힘의 핵심입니다.\n\n다만 얽힘이 있다고 해서 정보를 빛보다 빠르게 보낼 수 있는 것은 아닙니다. 측정 결과는 무작위로 나오며, 두 측정 결과의 상관관계를 확인하려면 일반적인 통신이 ",
+      "ms": 5814,
+      "checks": {
+        "분류": true,
+        "근거 부족 표시": true
+      },
+      "passed": true
+    },
+    {
+      "id": "out-03",
+      "category": "study_out",
+      "question": "리액트 useEffect의 의존성 배열은 어떻게 동작해?",
+      "route": "study",
+      "route_method": "llm",
+      "evidence": "low",
+      "cited_titles": [],
+      "tools": [
+        "find_course_materials",
+        "query_vector_db"
+      ],
+      "lms_sources": [],
+      "answer": "교안에서는 찾지 못했어요. 일반적인 React 동작을 기준으로 설명드릴게요.\n\n### 의존성 배열이 하는 일\n\n`useEffect`의 두 번째 인자인 의존성 배열은 **Effect를 언제 다시 실행할지** 정합니다. React는 렌더링이 끝난 뒤 배열 안의 값을 이전 렌더링 때와 비교하고, 값이 달라졌을 때 Effect를 다시 실행해요.\n\n```jsx\nuseEffect(() => {\n  // 실행할 작업\n  return () => {\n    // 정리 작업\n  };\n}, [값1, 값2]);\n```\n\n| 작성 방식 | 동작 |\n|---|---|\n| 배열을 생략: `useEffect(fn)` | 렌더링이 끝날 때마다 실행 |\n| 빈 배열: `useEffect(fn, [])` | 마운트 후 실행. 언마운트될 때 ",
+      "ms": 9651,
+      "checks": {
+        "분류": true,
+        "근거 부족 표시": true
+      },
+      "passed": true
+    },
+    {
+      "id": "out-04",
+      "category": "study_out",
+      "question": "블록체인의 지분증명(PoS) 합의 방식 설명해줘",
+      "route": "study",
+      "route_method": "llm",
+      "evidence": "low",
+      "cited_titles": [],
+      "tools": [
+        "query_vector_db"
+      ],
+      "lms_sources": [],
+      "answer": "교안에서는 찾지 못했어요.\n\n### 지분증명(PoS)이란?\n\n**PoS(Proof of Stake, 지분증명)**는 블록체인 거래를 확인하고 새 블록을 만드는 참여자를, 보유한 코인을 맡겨 둔 **지분(stake)** 등을 기준으로 선정하는 합의 방식입니다.\n\n### 어떻게 작동하나요?\n\n1. 참여자가 일정량의 코인을 네트워크에 맡깁니다. 이 참여자를 보통 **검증자(validator)**라고 부릅니다.\n2. 네트워크가 규칙에 따라 검증자를 선정해 거래를 확인하고 블록을 제안하게 합니다. 선정 방식은 블록체인마다 다르지만, 맡긴 지분이 클수록 선정 가능성이 높아지는 경우가 있습니다.\n3. 다른 검증자들이 블록이 규칙에 맞는지 확인하고, 정해진 절차에 따라 합의하면 블록이 체인에 추가됩니다.\n4. 정직하게 참",
+      "ms": 6750,
+      "checks": {
+        "분류": true,
+        "근거 부족 표시": true
+      },
+      "passed": true
+    },
+    {
+      "id": "out-05",
+      "category": "study_out",
+      "question": "머신러닝에서 경사하강법의 학습률은 어떻게 정해?",
+      "route": "study",
+      "route_method": "llm",
+      "evidence": "low",
+      "cited_titles": [
+        "[파이선프로그래밍실무] 7주차 AI와 데이터 분석"
+      ],
+      "tools": [
+        "find_course_materials",
+        "query_vector_db"
+      ],
+      "lms_sources": [],
+      "answer": "교안에서는 찾지 못했어요. 머신러닝 과목 자료가 등록되어 있지 않고, 검색된 교안에도 학습률 설정 방법은 나오지 않았어요.\n\n### 학습률은 이렇게 정해요\n학습률은 한 번의 업데이트에서 **얼마나 크게 이동할지** 정하는 값이에요.\n\n- **너무 크면** 최솟값을 지나쳐 손실이 흔들리거나 커질 수 있어요.\n- **너무 작으면** 학습이 매우 느려질 수 있어요.\n- 보통은 `0.1`, `0.01`, `0.001`처럼 몇 가지 후보를 시험하고, 검증 데이터의 성능과 학습 곡선을 비교해 선택해요.\n- 실무에서는 Adam 같은 최적화 알고리즘과 함께 `0.001`을 시작점으로 삼기도 하지만, 데이터와 모델에 따라 달라서 정답 하나가 있는 것은 아니에요.\n- 손실이 불안정하면 학습률을 낮추고, 안정적이지만 너무 느리",
+      "ms": 8630,
+      "checks": {
+        "분류": true,
+        "근거 부족 표시": true
+      },
+      "passed": true
+    },
+    {
+      "id": "info-01",
+      "category": "info",
+      "question": "졸업까지 몇 학점 남았어?",
+      "expect_all": [
+        "65"
+      ],
+      "route": "info",
+      "route_method": "llm",
+      "evidence": null,
+      "cited_titles": [],
+      "tools": [
+        "career_analyze"
+      ],
+      "lms_sources": [
+        "커리어 분석"
+      ],
+      "answer": "### 졸업까지 남은 학점\n\n졸업에 필요한 **110학점** 중 현재까지 **45학점**을 이수해, 졸업까지 **65학점** 남았어요. 이번 학기 수강 중인 **18학점**을 모두 이수하면 **47학점**이 남습니다.",
+      "ms": 5416,
+      "checks": {
+        "분류": true,
+        "학교 시스템 출처": true,
+        "사실 정확": true
+      },
+      "passed": true
+    },
+    {
+      "id": "info-02",
+      "category": "info",
+      "question": "지금까지 이수한 학점이 총 몇 학점이야?",
+      "expect_all": [
+        "45"
+      ],
+      "route": "info",
+      "route_method": "llm",
+      "evidence": null,
+      "cited_titles": [],
+      "tools": [
+        "lms_get_transcript"
+      ],
+      "lms_sources": [
+        "성적표"
+      ],
+      "answer": "### 이수 학점\n\n현재까지 **이수한 학점은 총 45학점**이에요. \n이번 학기에 수강 중인 **18학점은 아직 이수 학점에 포함되지 않았어요**.",
+      "ms": 4441,
+      "checks": {
+        "분류": true,
+        "학교 시스템 출처": true,
+        "사실 정확": true
+      },
+      "passed": true
+    },
+    {
+      "id": "info-03",
+      "category": "info",
+      "question": "졸업하려면 총 몇 학점이 필요해?",
+      "expect_all": [
+        "110"
+      ],
+      "route": "info",
+      "route_method": "llm",
+      "evidence": null,
+      "cited_titles": [],
+      "tools": [
+        "career_analyze"
+      ],
+      "lms_sources": [
+        "커리어 분석"
+      ],
+      "answer": "### 졸업에 필요한 총 학점\n\n졸업하려면 **총 110학점**이 필요해요. 현재까지 이수한 학점은 **45학점**이고, 이번 학기 수강 중인 학점까지 반영하면 졸업까지 **47학점이 남아요**.",
+      "ms": 5438,
+      "checks": {
+        "분류": true,
+        "학교 시스템 출처": true,
+        "사실 정확": true
+      },
+      "passed": true
+    },
+    {
+      "id": "info-04",
+      "category": "info",
+      "question": "이번 학기에 듣는 과목 알려줘",
+      "expect_all": [
+        "자바프로그래밍실무",
+        "정보통신개론"
+      ],
+      "route": "info",
+      "route_method": "llm",
+      "evidence": null,
+      "cited_titles": [],
+      "tools": [
+        "lms_get_transcript"
+      ],
+      "lms_sources": [
+        "성적표"
+      ],
+      "answer": "### 이번 학기 수강 과목\n\n2026학년도 2학기에 **6과목, 총 18학점**을 수강 중이세요.\n\n| 과목 | 학점 |\n|---|---:|\n| 데이터베이스기본 | 3 |\n| 정보통신개론 | 3 |\n| 컴퓨터공학활용 | 3 |\n| 파이선프로그래밍실무 | 3 |\n| 자바프로그래밍실무 | 3 |\n| AI로 완성하는 비즈니스 문서 | 3 |",
+      "ms": 5440,
+      "checks": {
+        "분류": true,
+        "학교 시스템 출처": true,
+        "사실 정확": true
+      },
+      "passed": true
+    },
+    {
+      "id": "info-05",
+      "category": "info",
+      "question": "아직 안 낸 과제 뭐 있어?",
+      "expect_any": [
+        "ERD",
+        "10주차",
+        "상속",
+        "pandas"
+      ],
+      "route": "info",
+      "route_method": "llm",
+      "evidence": null,
+      "cited_titles": [],
+      "tools": [
+        "lms_list_assignments"
+      ],
+      "lms_sources": [
+        "과제 목록"
+      ],
+      "answer": "### 아직 제출하지 않은 과제 4개\n\n| 과목 | 과제 | 마감 |\n|---|---|---|\n| 정보통신개론 | 10주차 정리 제출 | **오늘(11/6) 오전 8시**, 마감까지 약 **26분** |\n| 데이터베이스기본 | 수강신청 시스템 ERD 설계 | **오늘(11/6) 오후 7시**, 약 **8시간 26분 남음** |\n| 자바프로그래밍실무 | 상속과 인터페이스 실습 | **오늘(11/6) 오후 3시**, 약 **4시간 26분 남음** |\n| 파이선프로그래밍실무 | pandas로 CSV 데이터 정리 | **내일(11/7) 오전 3시**, 약 **16시간 26분 남음** |\n\n마감이 가장 가까운 **정보통신개론 과제**부터 확인해 보세요.",
+      "ms": 8541,
+      "checks": {
+        "분류": true,
+        "학교 시스템 출처": true,
+        "사실 정확": true
+      },
+      "passed": true
+    },
+    {
+      "id": "info-06",
+      "category": "info",
+      "question": "운영체제 다시 들어야 해?",
+      "expect_all": [
+        "운영체제"
+      ],
+      "route": "info",
+      "route_method": "llm",
+      "evidence": null,
+      "cited_titles": [],
+      "tools": [
+        "career_analyze"
+      ],
+      "lms_sources": [
+        "커리어 분석"
+      ],
+      "answer": "### 네, 재수강해야 해요\n\n운영체제는 **필수 과목인데 낙제 처리**되어 있어서, 졸업하려면 다시 이수해야 합니다. 재수강 필요 과목으로도 확인됐어요.",
+      "ms": 7244,
+      "checks": {
+        "분류": true,
+        "학교 시스템 출처": true,
+        "사실 정확": true
+      },
+      "passed": true
+    },
+    {
+      "id": "info-07",
+      "category": "info",
+      "question": "AI·데이터 직무로 가려면 다음 학기에 뭐 들으면 좋아?",
+      "expect_tool": "career_analyze",
+      "route": "info",
+      "route_method": "llm",
+      "evidence": null,
+      "cited_titles": [],
+      "tools": [
+        "career_analyze",
+        "lms_get_transcript"
+      ],
+      "lms_sources": [
+        "커리어 분석",
+        "성적표"
+      ],
+      "answer": "### 다음 학기 추천\n\nAI·데이터 직무를 목표로 하신다면, **직무 핵심 과목인 `머신러닝 기초`와 `데이터 분석`을 우선 추천**드려요. 현재 두 과목 모두 아직 듣지 않으셨고, 직무 핵심 과목 진행률은 **0/4**입니다.\n\n| 우선순위 | 과목 | 학점 | 추천 이유 |\n|---|---|---:|---|\n| 1 | **운영체제 재수강** | 3 | 낙제한 전공필수 과목이라 재수강이 필요해요. |\n| 2 | **소프트웨어 공학** | 3 | 졸업에 필요한 전공필수 과목이에요. |\n| 3 | **머신러닝 기초** | 3 | AI·데이터 직무 핵심 과목이에요. |\n| 4 | **데이터 분석** | 3 | 데이터 분석 역량을 쌓는 직무 핵심 과목이에요. |\n\n가능한 수강 여력이 더 있다면 **클라우드 컴퓨",
+      "ms": 8555,
+      "checks": {
+        "분류": true,
+        "학교 시스템 출처": true,
+        "필요한 도구 사용": true
+      },
+      "passed": true
+    },
+    {
+      "id": "info-08",
+      "category": "info",
+      "question": "내 성적표 보여줘",
+      "expect_any": [
+        "A+",
+        "A0",
+        "B+",
+        "B0"
+      ],
+      "route": "info",
+      "route_method": "llm",
+      "evidence": null,
+      "cited_titles": [],
+      "tools": [
+        "lms_get_transcript"
+      ],
+      "lms_sources": [
+        "성적표"
+      ],
+      "answer": "### 성적표\n\n#### 2025학년도 1학기\n\n| 과목 | 학점 | 성적 |\n|---|---:|:---:|\n| 대학글쓰기 | 2 | A0 |\n| 기초수학 | 3 | B0 |\n| 프로그래밍 기초(파이썬) | 3 | A+ |\n| 컴퓨터 개론 | 3 | B0 |\n| 이산수학 | 3 | C+ |\n| 웹 프로그래밍 | 3 | B+ |\n| 실용영어회화1 | 2 | B+ |\n\n#### 2025학년도 2학기\n\n| 과목 | 학점 | 성적 |\n|---|---:|:---:|\n| 진로설계와 자기계발 | 1 | P |\n| 실용영어회화2 | 2 | B0 |\n| 컴퓨터 구조 | 3 | B+ |\n| 운영체제 | 3 | F — 낙제 |\n| 자료구조 | 3 | A0 |\n| 자바 프로그래밍 | 3 | C+ |\n\n#### 2026학년도 1학",
+      "ms": 7553,
+      "checks": {
+        "분류": true,
+        "학교 시스템 출처": true,
+        "사실 정확": true
+      },
+      "passed": true
+    }
+  ]
+}
