@@ -60,15 +60,12 @@ class Settings(BaseSettings):
     lms_token_key: SecretStr | None = None  # 학교가 발급한 학생 토큰을 DB에 암호화해 저장하는 서버 키 (32자 이상)
     lms_timeout_seconds: float = Field(default=10.0, gt=0, le=30)
 
-    # --- Web Push 알림 ---
-    vapid_public_key: str | None = None
-    vapid_private_key: SecretStr | None = None
-    vapid_subject: str = "mailto:you@example.com"
-    # 구독 endpoint로 서버가 요청을 보내므로(SSRF 위험) 알려진 푸시 서비스 호스트만 허용 (접미사 일치)
-    push_allowed_hosts: str = (
-        "fcm.googleapis.com,updates.push.services.mozilla.com,push.services.mozilla.com,"
-        "web.push.apple.com,notify.windows.com"
-    )
+    # --- 메일 알림 (Gmail SMTP · 앱 비밀번호) ---
+    gmail_address: str | None = None             # 보내는 Gmail 주소 (알림 전용 계정 권장)
+    gmail_app_password: SecretStr | None = None  # Google 계정 '앱 비밀번호' 16자리 (공백은 무시)
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 465                         # SSL
+    email_test_daily_limit: int = Field(default=3, ge=0, le=20)  # 학생 1명이 하루에 보낼 수 있는 테스트 메일 수
 
     # --- 매일 알림 (Vercel Cron) ---
     cron_secret: SecretStr | None = None
@@ -80,8 +77,8 @@ class Settings(BaseSettings):
     semester_start: dt.date = dt.date(2026, 8, 31)  # 1주차가 시작하는 월요일
 
     @field_validator(
-        "lms_api_key", "lms_api_base_url", "moodle_base_url", "vapid_public_key", "vapid_private_key", "cron_secret",
-        "lms_oauth_client_secret", "lms_token_key",
+        "lms_api_key", "lms_api_base_url", "moodle_base_url", "cron_secret",
+        "lms_oauth_client_secret", "lms_token_key", "gmail_address", "gmail_app_password",
         mode="before",
     )
     @classmethod
@@ -134,12 +131,8 @@ class Settings(BaseSettings):
         return frozenset(h.strip().lower() for h in self.lms_allowed_hosts.split(",") if h.strip())
 
     @property
-    def push_enabled(self) -> bool:
-        return bool(self.vapid_public_key and self.vapid_private_key)
-
-    @property
-    def push_hosts(self) -> tuple[str, ...]:
-        return tuple(h.strip().lower() for h in self.push_allowed_hosts.split(",") if h.strip())
+    def email_enabled(self) -> bool:
+        return bool(self.gmail_address and self.gmail_app_password)
 
     @property
     def auth_key(self) -> str:

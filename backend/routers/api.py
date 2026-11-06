@@ -14,6 +14,7 @@ from backend.core.errors import AppError, ConfigError, UnauthorizedError
 from backend.core.supabase_client import DbDep, SettingsDep
 from backend.integrations.lms_client import LmsAssignment, LmsDep, LmsMaterialSummary, LmsSubmission, LmsTranscript
 from backend.routers.deps import ApiAgentDep
+from backend.web.session import public_base_url
 from backend.schemas.career import CareerReport, CareerTargetRequest, CareerTrackItem
 from backend.schemas.study_tools import (
     FlashcardDeck,
@@ -33,9 +34,6 @@ from backend.schemas.models import (
     CronSummary,
     HealthResponse,
     LmsLinkStatus,
-    PushResult,
-    PushSubscriptionIn,
-    PushUnsubscribeIn,
     QuizGenerateRequest,
     QuizResponse,
     QuizSubmitRequest,
@@ -49,8 +47,6 @@ from backend.services import (
     career_service,
     lms_link_service,
     notification_service,
-    pet_service,
-    push_service,
     review_service,
     streak_service,
     study_service,
@@ -231,45 +227,10 @@ async def career_report(
     return await career_service.build_report(db, lms, user.id, agent if with_ai else None, job_role)
 
 
-# ---------------- 푸시 알림 ----------------
-@router.get("/push/public-key", tags=["push"])
-async def push_public_key(settings: SettingsDep) -> dict[str, object]:
-    """브라우저 구독용 VAPID 공개 키 (공개해도 되는 값)."""
-    return {"enabled": settings.push_enabled, "publicKey": settings.vapid_public_key}
-
-
-@router.post("/push/subscribe", response_model=PushResult, tags=["push"])
-async def push_subscribe(
-    body: PushSubscriptionIn, request: Request, user: CurrentUser, db: DbDep, settings: SettingsDep
-) -> PushResult:
-    await push_service.save_subscription(db, settings, user.id, body, request.headers.get("user-agent"))
-    return PushResult(ok=True, message="알림을 켰어요.")
-
-
-@router.post("/push/unsubscribe", response_model=PushResult, tags=["push"])
-async def push_unsubscribe(body: PushUnsubscribeIn, user: CurrentUser, db: DbDep) -> PushResult:
-    await push_service.delete_subscription(db, user.id, body.endpoint)
-    return PushResult(ok=True, message="알림을 껐어요.")
-
-
-@router.post("/push/test", response_model=PushResult, tags=["push"])
-async def push_test(user: CurrentUser, db: DbDep, settings: SettingsDep) -> PushResult:
-    pet_name = await study_service.get_pet_name(db, user.id)
-    payload = push_service.PushPayload(
-        title=pet_service.notify_title(pet_name),
-        body="알림이 잘 도착했어요! 매일 저녁 8시쯤 공부할 거리를 알려드릴게요.",
-        url="/",
-        tag="test",
-    )
-    delivered = await push_service.send_to_user(db, settings, user.id, payload)
-    if delivered == 0:
-        return PushResult(ok=False, message="알림을 받을 기기가 없어요. 먼저 '알림 켜기'를 눌러 주세요.")
-    return PushResult(ok=True, delivered=delivered, message=f"{delivered}개 기기로 보냈어요.")
-
-
-# ---------------- 매일 알림 · 자동 동기화 (Vercel Cron) ----------------
+# ---------------- 매일 메일 알림 (Vercel Cron) ----------------
 @router.get("/cron/daily-reminders", response_model=CronSummary, tags=["cron"])
 async def cron_daily_reminders(
+    request: Request,
     db: DbDep,
     settings: SettingsDep,
     lms: LmsDep,
@@ -281,7 +242,7 @@ async def cron_daily_reminders(
     expected = f"Bearer {settings.cron_secret.get_secret_value()}"
     if not authorization or not hmac.compare_digest(authorization.encode(), expected.encode()):
         raise UnauthorizedError("Cron 인증에 실패했습니다.")
-    return await notification_service.run_daily(db, settings, lms)
+    return await notification_service.run_daily(db, settings, lms, base_url=public_base_url(request))
 
 
 # ---------------- 노트북LM 참고 학습 도구 ----------------

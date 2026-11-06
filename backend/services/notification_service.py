@@ -1,4 +1,6 @@
-"""매일 저녁 알림 (듀오링고 스타일) + 자동 동기화.
+"""매일 저녁 메일 알림 (듀오링고 스타일) + 자동 동기화.
+
+알림은 📧 메일로만 보낸다 (웹 푸시·카카오톡은 쓰지 않는다). 메일 알림을 직접 켠 학생에게만 보낸다.
 
 하루에 '가장 중요한 알림 하나'만 보낸다. 우선순위:
   1. assignment_due : 24시간 안에 마감되는 미제출 과제 (코스모스)
@@ -6,7 +8,7 @@
   3. streak_risk    : 연속 학습이 끊길 위기 — 오늘 이미 공부했으면 보내지 않음
 
 알림 고르기는 두 단계로 나눈다: gather_reminder_inputs(DB·LMS 조회) → choose_reminder(계산만).
-푸시(Cron)와 📧 메일 미리보기(email_service)가 같은 재료와 같은 규칙을 쓴다.
+매일 Cron 발송, 테스트 메일, 화면의 '오늘 메일 미리보기'가 모두 같은 재료와 같은 규칙을 쓴다 (email_service).
 
 Vercel Cron은 같은 실행을 두 번 보낼 수 있으므로(idempotency),
 notification_logs에 (user, kind, ref_key, 날짜)를 먼저 '선점 기록'한 뒤에만 발송한다.
@@ -29,7 +31,6 @@ from backend.schemas.models import CronSummary, PetStatus, ReviewListResponse, S
 from backend.services import (
     lms_link_service,
     pet_service,
-    push_service,
     review_service,
     streak_service,
     study_service,
@@ -146,12 +147,16 @@ async def build_reminder(db: AsyncClient, lms: LmsClient, user_id: UUID) -> Remi
     return choose_reminder(await gather_reminder_inputs(db, lms, user_id))
 
 
+TEST_KIND = "email_test"
+
+
 async def _already_notified_today(db: AsyncClient, user_id: UUID) -> bool:
     res = (
         await db.table("notification_logs")
         .select("id")
         .eq("user_id", str(user_id))
         .eq("local_date", today_kst().isoformat())
+        .neq("kind", TEST_KIND)  # 테스트 메일은 오늘 저녁 알림과 상관없다
         .limit(1)
         .execute()
     )
@@ -178,30 +183,119 @@ async def _claim(db: AsyncClient, user_id: UUID, reminder: Reminder) -> str | No
     return str(res.data[0]["id"]) if res.data else None
 
 
-async def notify_user(db: AsyncClient, settings: Settings, lms: LmsClient, user_id: UUID) -> str:
-    """결과: 'sent' | 'skipped' | 'failed'"""
+# ---------------------------------------------------------------------
+# 📧 메일 알림 설정 · 받는 사람
+# ---------------------------------------------------------------------
+@dataclass(frozen=True)
+class EmailSettings:
+    enabled: bool             # 학생이 메일 알림을 켰는지
+    alert_email: str | None   # 따로 정한 받을 주소 (없으면 가입 메일)
+    account_email: str | None
+
+    @property
+    def recipient(self) -> str | None:
+        return self.alert_email or self.account_email
+
+
+async def get_email_settings(db: AsyncClient, user_id: UUID) -> EmailSettings:
+    try:
+        res = (
+            await db.table("users").select("email,email_alerts,alert_email").eq("id", str(user_id)).limit(1).execute()
+        )
+    except Exception:
+        logger.warning("메일 알림 설정 조회 실패 (마이그레이션 전?)", exc_info=True)
+        return EmailSettings(enabled=False, alert_email=None, account_email=None)
+    row = res.data[0] if res.data else {}
+    return EmailSettings(bool(row.get("email_alerts")), row.get("alert_email"), row.get("email"))
+
+
+async def save_email_settings(db: AsyncClient, user_id: UUID, *, enabled: bool, alert_email: str | None) -> None:
+    try:
+        await db.table("users").update({"email_alerts": enabled, "alert_email": alert_email}).eq(
+            "id", str(user_id)
+        ).execute()
+    except Exception:
+        logger.exception("메일 알림 설정 저장 실패")
+        raise AppError("메일 알림 설정을 저장하지 못했어요.", code="email_settings_failed", status_code=502) from None
+
+
+async def email_recipients(db: AsyncClient) -> dict[UUID, str]:
+    """메일 알림을 켠 학생 → 받을 주소."""
+    res = await db.table("users").select("id,email,email_alerts,alert_email").eq("email_alerts", True).execute()
+    out: dict[UUID, str] = {}
+    for row in res.data or []:
+        address = row.get("alert_email") or row.get("email")
+        if address:
+            out[UUID(row["id"])] = address
+    return out
+
+
+async def tests_sent_today(db: AsyncClient, user_id: UUID) -> int:
+    res = (
+        await db.table("notification_logs")
+        .select("id", count="exact")
+        .eq("user_id", str(user_id))
+        .eq("kind", TEST_KIND)
+        .eq("local_date", today_kst().isoformat())
+        .execute()
+    )
+    return res.count or 0
+
+
+async def send_test_email(
+    db: AsyncClient, settings: Settings, lms: LmsClient, user_id: UUID, *, base_url: str
+) -> str:
+    """오늘 저녁에 갈 메일을 지금 한 번 보내 본다 (하루 횟수 제한). 받은 주소를 돌려준다."""
+    from backend.services import email_service  # email_service가 이 모듈을 쓰므로 순환을 피해 여기서 가져온다
+
+    prefs = await get_email_settings(db, user_id)
+    if not prefs.recipient:
+        raise AppError("받을 메일 주소가 없어요. 주소를 먼저 저장해 주세요.", code="email_no_recipient", status_code=400)
+    if await tests_sent_today(db, user_id) >= settings.email_test_daily_limit:
+        raise AppError(f"테스트 메일은 하루 {settings.email_test_daily_limit}번까지 보낼 수 있어요.",
+                       code="email_test_limit", status_code=429)
+    inputs = await gather_reminder_inputs(db, lms, user_id)
+    message = email_service.build_daily_email(inputs, base_url=base_url, to=prefs.recipient)
+    await email_service.send(settings, message, prefs.recipient, test=True)
+    await db.table("notification_logs").insert({
+        "user_id": str(user_id), "kind": TEST_KIND, "ref_key": dt.datetime.now(dt.UTC).isoformat(),
+        "title": message.subject[:200], "body": "테스트 메일", "delivered": 1,
+    }).execute()
+    return prefs.recipient
+
+
+async def notify_user(
+    db: AsyncClient, settings: Settings, lms: LmsClient, user_id: UUID, *, to: str, base_url: str
+) -> str:
+    """오늘 보낼 알림이 있으면 메일 한 통을 보낸다. 결과: 'sent' | 'skipped' | 'failed'"""
+    from backend.services import email_service
+
     if await _already_notified_today(db, user_id):
         return "skipped"
-    reminder = await build_reminder(db, lms, user_id)
+    inputs = await gather_reminder_inputs(db, lms, user_id)
+    reminder = choose_reminder(inputs)
     if reminder is None:
         return "skipped"
-    log_id = await _claim(db, user_id, reminder)
+    log_id = await _claim(db, user_id, reminder)  # 먼저 기록해 두 번 보내지 않게 한다
     if log_id is None:
         return "skipped"
-    payload = push_service.PushPayload(title=reminder.title, body=reminder.body, url=reminder.url, tag=reminder.kind)
-    delivered = await push_service.send_to_user(db, settings, user_id, payload)
-    await db.table("notification_logs").update({"delivered": delivered}).eq("id", log_id).execute()
-    return "sent" if delivered else "failed"
+    try:
+        await email_service.send(settings, email_service.build_daily_email(inputs, base_url=base_url, to=to), to)
+    except AppError as exc:
+        logger.warning("메일 알림 실패: %s", exc.code)
+        return "failed"
+    await db.table("notification_logs").update({"delivered": 1}).eq("id", log_id).execute()
+    return "sent"
 
 
-async def run_daily(db: AsyncClient, settings: Settings, lms: LmsClient) -> CronSummary:
-    """매일 Cron: LMS 연결 학생 자동 동기화 + 구독자에게 알림."""
+async def run_daily(db: AsyncClient, settings: Settings, lms: LmsClient, *, base_url: str) -> CronSummary:
+    """매일 Cron: LMS 연결 학생 자동 동기화 + 메일 알림을 켠 학생에게 메일."""
     started = time.monotonic()
     linked_res = await db.table("users").select("id,lms_student_id,lms_token_enc").execute()
     # 학교 계정으로 연결해 학생 전용 토큰이 있는 사용자만 (각자 자기 토큰으로 동기화)
     linked = {UUID(r["id"]) for r in linked_res.data or [] if r.get("lms_student_id") and r.get("lms_token_enc")}
-    subscribed = await push_service.subscribed_user_ids(db) if settings.push_enabled else set()
-    users = sorted(linked | subscribed, key=str)
+    recipients = await email_recipients(db) if settings.email_enabled else {}
+    users = sorted(linked | set(recipients), key=str)
 
     counts = {"synced": 0, "imported": 0, "sent": 0, "skipped": 0, "failed": 0}
     semaphore = asyncio.Semaphore(CONCURRENCY)
@@ -216,8 +310,9 @@ async def run_daily(db: AsyncClient, settings: Settings, lms: LmsClient) -> Cron
                 # 한 사람이 오래 걸려도 전체가 Vercel 제한 시간(60초)을 넘기지 않게 남은 시간만큼만 기다린다
                 async with asyncio.timeout(remaining):
                     # 알림이 더 중요하므로 먼저 보내고, 자료 동기화는 그다음에 한다
-                    if user_id in subscribed:
-                        counts[await notify_user(db, settings, lms, user_id)] += 1
+                    if user_id in recipients:
+                        counts[await notify_user(db, settings, lms, user_id, to=recipients[user_id],
+                                                 base_url=base_url)] += 1
                     if user_id in linked:
                         result = await lms_link_service.sync_user(db, settings, lms, user_id, max_imports=3)
                         counts["synced"] += int(result.linked)
