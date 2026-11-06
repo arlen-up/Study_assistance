@@ -158,9 +158,8 @@
     <button type="button" class="chip" hx-post="/ui/chat/quiz" hx-vals='{"document_id": "{{ document_id }}"}'
             hx-target="#chat-log" hx-swap="beforeend scroll:#chat-log:bottom" data-chat-action="퀴즈·카드를 만드는 중…">🧠 퀴즈·카드</button>
     {% endif %}
-    <button type="button" class="chip" hx-post="/ui/chat" hx-include="#chat-history"
-            hx-vals='{"message": "이 교안의 핵심 개념을 마인드맵 그림으로 정리해줘", "route": "study", "document_id": "{{ document_id }}"}'
-            hx-target="#chat-log" hx-swap="beforeend scroll:#chat-log:bottom" data-chat-action="그림으로 정리하는 중…">🗺 그림으로 정리</button>
+    <button type="button" class="chip" hx-post="/ui/diagram" hx-vals='{"document_id": "{{ document_id }}"}'
+            hx-target="#doc-viewer" hx-swap="innerHTML" data-open-viewer>🗺 그림으로 정리</button>
     <button type="button" class="chip" hx-get="/ui/viewer/{{ document_id }}" hx-target="#doc-viewer" hx-swap="innerHTML"
             data-open-viewer>📄 교안 보기</button>
   </div>

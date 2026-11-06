@@ -269,6 +269,31 @@ async def ui_chat(
     )
 
 
+# 답변 밑 '그림으로 정리' 단추: 결과를 채팅이 아니라 오른쪽 '교안 보기' 칸에 크게 띄운다
+@router.post("/ui/diagram", response_class=HTMLResponse)
+async def ui_diagram(
+    request: Request,
+    _user: WebUser,
+    agent: WebAgentDep,
+    document_id: Annotated[str, Form()],
+) -> HTMLResponse:
+    doc_id = _parse_uuid(document_id)
+    try:
+        chat_request = ChatRequest(
+            message="이 교안의 핵심 개념을 마인드맵 그림으로 정리해줘",
+            document_id=doc_id,
+            route="study",
+        )
+    except ValidationError:
+        raise BadRequestError("그림으로 정리할 교안을 골라 주세요.") from None
+
+    try:
+        result = await agent.chat(chat_request)
+    except AppError as exc:
+        return _render(request, "partials/chat_error.html", {"message": exc.message, "draft": ""})
+    return _render(request, "partials/diagram_view.html", {"result": result, "document_id": doc_id})
+
+
 # 답변 밑 '이어서 하기' 단추: 교안을 코드가 바로 읽고 AI는 한 번만 불러서 빠르다
 @router.post("/ui/chat/summary", response_class=HTMLResponse)
 async def ui_chat_summary(

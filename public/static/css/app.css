@@ -480,3 +480,8 @@ mark.hl { background: var(--hl); color: inherit; border-radius: 3px; padding: 1p
   .chat-options .select { max-width: none; }
   .kpi-value { font-size: 1.5rem; }
 }
+
+/* ---------- 🗺 그림으로 정리: 교안 보기 칸에 크게 ---------- */
+.diagram-view { min-height: 420px; }
+.diagram-body { font-size: 1rem; line-height: 1.7; }
+.diagram-body pre.mermaid { min-height: 340px; overflow: auto; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
