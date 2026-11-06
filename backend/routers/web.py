@@ -270,6 +270,84 @@ async def ui_chat(
     )
 
 
+# 📝 기말 예상 문제: 문항 수·요청을 정해 만들고, 답을 적으면 AI가 의미로 채점한다
+@router.get("/ui/exam/new", response_class=HTMLResponse)
+async def ui_exam_new(request: Request, _user: WebUser, document_id: Annotated[str, Query()] = "") -> HTMLResponse:
+    doc_id = _parse_uuid(document_id)
+    if doc_id is None:
+        raise BadRequestError("예상 문제를 만들 교안을 골라 주세요.")
+    return _render(request, "partials/exam_new.html", {"document_id": doc_id})
+
+
+@router.post("/ui/exam", response_class=HTMLResponse)
+async def ui_exam_create(
+    request: Request,
+    user: WebUser,
+    db: DbDep,
+    agent: WebAgentDep,
+    document_id: Annotated[str, Form()],
+    count: Annotated[int, Form(ge=1, le=10)] = 5,
+    ask: Annotated[str, Form(max_length=300)] = "",
+) -> HTMLResponse:
+    doc_id = _parse_uuid(document_id)
+    if doc_id is None:
+        raise BadRequestError("예상 문제를 만들 교안을 골라 주세요.")
+    # 정답은 요청 문장에 '정답'이라고 적었을 때만 채점 결과에 함께 보여 준다
+    show_answer = "정답" in ask
+    draft, model_name = await agent.generate_exam(doc_id, count)
+    quiz_id = await quiz_service.save_exam(
+        db, user_id=user.id, document_id=doc_id, questions=draft.questions, model_name=model_name
+    )
+    return _render(
+        request,
+        "partials/exam_form.html",
+        {"quiz_id": quiz_id, "questions": draft.questions, "show_answer": show_answer},
+    )
+
+
+@router.post("/ui/exam/{quiz_id}/grade", response_class=HTMLResponse)
+async def ui_exam_grade(
+    request: Request,
+    quiz_id: UUID,
+    user: WebUser,
+    db: DbDep,
+    agent: WebAgentDep,
+    show_answer: Annotated[str, Form()] = "0",
+) -> HTMLResponse:
+    form = await request.form()
+    _, questions = await quiz_service.load_quiz(db, quiz_id=quiz_id, user_id=user.id)
+    answers = [str(form.get(f"a_{i}", "")).strip()[:500] for i in range(len(questions))]
+    if any(not a for a in answers):
+        raise BadRequestError("모든 문제에 답을 적은 뒤 채점해 주세요.")
+    graded = await agent.grade_exam([(q.question, q.answer, q.explanation) for q in questions], answers)
+    by_index = {r.index: r for r in graded.results}
+    rows = []
+    for i, q in enumerate(questions):
+        item = by_index.get(i)
+        rows.append(
+            {
+                "index": i,
+                "question": q.question,
+                "your_answer": answers[i],
+                "correct": bool(item and item.correct),
+                "feedback": item.feedback if item else "채점 결과를 받지 못했어요.",
+                "expected": q.answer,
+                "rubric": q.explanation,
+            }
+        )
+    return _render(
+        request,
+        "partials/exam_result.html",
+        {
+            "quiz_id": quiz_id,
+            "rows": rows,
+            "score": sum(1 for r in rows if r["correct"]),
+            "total": len(rows),
+            "show_answer": show_answer == "1",
+        },
+    )
+
+
 # 답변 밑 '그림으로 정리' 단추: 결과를 채팅이 아니라 오른쪽 '교안 보기' 칸에 크게 띄운다
 @router.post("/ui/diagram", response_class=HTMLResponse)
 async def ui_diagram(

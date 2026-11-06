@@ -493,3 +493,12 @@ mark.hl { background: var(--hl); color: inherit; border-radius: 3px; padding: 1p
 .slide-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
 .slide-progress { margin-bottom: 4px; }
 .quiz-explain { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
+
+/* ---------- 📝 기말 예상 문제 ---------- */
+.exam-range { width: 100%; }
+.exam-form { gap: 12px; }
+.exam-item { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
+.exam-item legend { margin-bottom: 4px; }
+.exam-row { display: grid; gap: 6px; padding: 12px; margin-top: 8px; border: 1px solid var(--border); border-radius: var(--radius); }
+.exam-row.is-right { border-color: #86efac; }
+.exam-row.is-wrong { border-color: #fca5a5; }

@@ -194,7 +194,7 @@ class SummaryResponse(BaseModel):
 # ---------------------------------------------------------------------
 # 적응형 마이크로 퀴즈
 # ---------------------------------------------------------------------
-QuizType = Literal["multiple_choice", "ox", "code_blank"]
+QuizType = Literal["multiple_choice", "ox", "code_blank", "short_answer"]
 Difficulty = Literal["easy", "medium", "hard"]
 CODE_BLANK_MARK = "____"
 
@@ -235,6 +235,9 @@ class QuizQuestionDraft(BaseModel):
             self.answer = normalized
             self.options = ["O", "X"]
             self.code = None
+        elif self.type == "short_answer":  # 기말 예상 문제(서술형): 보기·코드 없음, 채점은 AI가 의미로 한다
+            self.options = []
+            self.code = None
         else:  # code_blank
             if not self.code or CODE_BLANK_MARK not in self.code:
                 raise ValueError(f"코드 빈칸 문제는 {CODE_BLANK_MARK} 가 포함된 code가 필요합니다")
@@ -252,6 +255,34 @@ class QuizDraft(BaseModel):
 class QuizGenerateRequest(RequestModel):
     document_id: UUID | None = Field(default=None, description="비우면 가장 최근 교안(오늘의 교안)을 사용")
     difficulty: Difficulty = "medium"
+
+
+class ExamQuestionDraft(BaseModel):
+    """LLM 구조화 출력: 기말 예상 문제 1개 (서술형·단답형)."""
+
+    question: str = Field(min_length=5, description="기말고사에 나올 만한 예상 문제 (한국어, 교안 내용 기반).")
+    answer: str = Field(min_length=1, max_length=500, description="모범 답안: 핵심 내용을 한두 문장으로.")
+    explanation: str = Field(min_length=5, description="채점 기준과 해설 (한국어, 2~3문장).")
+
+
+class ExamDraft(BaseModel):
+    """LLM 구조화 출력: 기말 예상 문제 세트."""
+
+    questions: list[ExamQuestionDraft] = Field(min_length=1, max_length=10, description="요청한 개수만큼 만든다.")
+
+
+class ExamGradeItem(BaseModel):
+    """LLM 구조화 출력: 학생 답 1개의 채점 결과."""
+
+    index: int = Field(ge=0, description="문제 번호(0부터).")
+    correct: bool = Field(description="학생 답이 모범 답안과 의미가 같으면 true. 표현이 달라도 뜻이 맞으면 정답.")
+    feedback: str = Field(max_length=300, description="맞으면 한 줄 칭찬, 틀리면 빠진 핵심 한 줄.")
+
+
+class ExamGradeDraft(BaseModel):
+    """LLM 구조화 출력: 예상 문제 채점 결과 세트."""
+
+    results: list[ExamGradeItem]
 
 
 class PublicQuizQuestion(BaseModel):
