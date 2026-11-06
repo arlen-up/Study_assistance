@@ -61,6 +61,7 @@ from backend.schemas.models import (
     ToolCallTrace,
 )
 from backend.schemas.study_tools import FlashcardDeck, FlashcardDeckDraft, MindMap, MindMapDraft
+from backend.services.school_info import SCHOOL_NOT_FOUND_ANSWER, SCHOOL_RULE, is_school_question
 from backend.services import career_service, study_tools_service
 from backend.services.embedding_service import EmbeddingService
 
@@ -551,6 +552,8 @@ class AgentService:
         self, request: ChatRequest, route: RouteInfo, deps: ToolDeps, traces: list[ToolCallTrace]
     ) -> str:
         notes: list[str] = []
+        if is_school_question(request.message):
+            notes.append(SCHOOL_RULE)
         if request.document_id:
             title = await self._get_document_title(request.document_id)
             notes.append(f"학생이 고른 교안: '{title}' (document_id: {request.document_id}) — 이 교안 안에서 찾는다.")
@@ -605,6 +608,8 @@ class AgentService:
             raw = await self._answer_info(request, deps, traces)
         else:
             raw = await self._answer_study(request, route, deps, traces)
+            if is_school_question(request.message) and not deps.retrieved:
+                raw = SCHOOL_NOT_FOUND_ANSWER
         return await self._finish(request, route, raw, deps, traces, started)
 
     # -----------------------------------------------------------------
