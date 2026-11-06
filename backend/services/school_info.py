@@ -35,3 +35,12 @@ SCHOOL_RULE: Final[str] = (
 def is_school_question(text: str) -> bool:
     """학교 정보(학식·장학금·학과 등)를 묻는 질문인지 판단한다."""
     return any(keyword in text for keyword in SCHOOL_KEYWORDS)
+
+
+# 학식(구내식당 메뉴) 질문은 일상 질문으로 분류한다
+MEAL_KEYWORDS: Final[tuple[str, ...]] = ("학식", "식단", "학생식당")
+
+
+def is_meal_question(text: str) -> bool:
+    """학식(구내식당 메뉴) 질문인지 판단한다. 이런 질문은 일상 대화로 답한다."""
+    return any(keyword in text for keyword in MEAL_KEYWORDS)

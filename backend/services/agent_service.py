@@ -61,7 +61,12 @@ from backend.schemas.models import (
     ToolCallTrace,
 )
 from backend.schemas.study_tools import FlashcardDeck, FlashcardDeckDraft, MindMap, MindMapDraft
-from backend.services.school_info import SCHOOL_NOT_FOUND_ANSWER, SCHOOL_RULE, is_school_question
+from backend.services.school_info import (
+    SCHOOL_NOT_FOUND_ANSWER,
+    SCHOOL_RULE,
+    is_meal_question,
+    is_school_question,
+)
 from backend.services import career_service, study_tools_service
 from backend.services.embedding_service import EmbeddingService
 
@@ -516,6 +521,8 @@ class AgentService:
 
         if request.route:
             return RouteInfo(type=request.route, reason="답변 밑 단추로 요청했어요", method="button", plan=plan)
+        if is_meal_question(request.message):
+            return RouteInfo(type="chat", reason="학식 질문은 일상 질문으로 분류해요", method="rule", duration_ms=elapsed(), plan=plan)
 
         recent = request.history[-2:]
         context = "\n".join(f"{'학생' if t.role == 'user' else '도우미'}: {t.content[:300]}" for t in recent)
