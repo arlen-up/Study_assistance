@@ -1,0 +1,13 @@
+{# 🗺 그림으로 정리: 결과를 교안 보기 칸에 크게 띄운다 (mermaid 그림은 app.js가 그린다) #}
+<div class="viewer diagram-view" data-viewer>
+  <div class="viewer-head">
+    <div class="viewer-heading">
+      <p class="viewer-kicker">🗺 그림으로 정리</p>
+      <h2 class="viewer-title">교안 핵심 개념 그림</h2>
+      <p class="muted xsmall">그림 아래 설명을 함께 읽어 보세요.</p>
+    </div>
+    <button type="button" class="btn outline sm" hx-get="/ui/viewer/{{ document_id }}" hx-target="#doc-viewer" hx-swap="innerHTML"
+            aria-label="교안 보기로 돌아가기">교안 보기로</button>
+  </div>
+  <div class="md diagram-body">{{ result.answer | markdown }}</div>
+</div>

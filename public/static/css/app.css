@@ -480,3 +480,29 @@ mark.hl { background: var(--hl); color: inherit; border-radius: 3px; padding: 1p
   .chat-options .select { max-width: none; }
   .kpi-value { font-size: 1.5rem; }
 }
+
+/* ---------- 🗺 그림으로 정리: 교안 보기 칸에 크게 ---------- */
+.diagram-view { min-height: 420px; }
+.diagram-body { font-size: 1rem; line-height: 1.7; }
+.diagram-body pre.mermaid { min-height: 340px; overflow: auto; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+
+/* ---------- 퀴즈·카드 슬라이드: 한 번에 한 장 ---------- */
+.slide-radio { position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; }
+.slide-card { display: none; }
+.slide-radio:checked + .slide-card { display: block; }
+.slide-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.slide-progress { margin-bottom: 4px; }
+.quiz-explain { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
+
+/* ---------- 📝 기말 예상 문제 ---------- */
+.exam-range { width: 100%; }
+.exam-form { gap: 12px; }
+.exam-item { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
+.exam-item legend { margin-bottom: 4px; }
+.exam-row { display: grid; gap: 6px; padding: 12px; margin-top: 8px; border: 1px solid var(--border); border-radius: var(--radius); }
+.exam-row.is-right { border-color: #86efac; }
+.exam-row.is-wrong { border-color: #fca5a5; }
+
+/* ---------- 📄 PDF 쪽 그림 (근거 강조) ---------- */
+.pdf-page-figure { margin: 0 0 8px; }
+.pdf-page { display: block; width: 100%; height: auto; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; }

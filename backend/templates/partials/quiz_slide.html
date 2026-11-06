@@ -1,0 +1,33 @@
+{% import "partials/_macros.html" as m %}
+{# 퀴즈 슬라이드: 문제 한 장만 보여 준다. 답을 확인하면 바로 채점한다 #}
+<div class="quiz-box" id="quiz-{{ quiz_id }}">
+  <form class="stack quiz-slide" hx-post="/ui/quiz/{{ quiz_id }}/check" hx-target="#quiz-{{ quiz_id }}" hx-swap="outerHTML"
+        hx-disabled-elt="find button[type=submit]">
+    <input type="hidden" name="index" value="{{ index }}">
+    <input type="hidden" name="answers_json" value="{{ answers_json }}">
+    <input type="hidden" name="started_at" value="{{ started_at }}">
+    <p class="slide-progress muted small">문제 {{ index + 1 }} / {{ total }}</p>
+    <fieldset class="quiz-card">
+      <legend class="quiz-card-head">
+        <span class="badge outline">카드 {{ index + 1 }}</span>
+        <span class="badge secondary">{{ m.type_labels[q.type] }}</span>
+      </legend>
+      <p class="q-text pre">{{ q.question }}</p>
+      {% if q.type == "code_blank" %}
+        {% if q.code %}<pre class="code"><code>{{ q.code }}</code></pre>{% endif %}
+        <input class="input mono" name="answer" required maxlength="500"
+               placeholder="____ 에 들어갈 답" aria-label="{{ index + 1 }}번 답안" autocomplete="off">
+      {% else %}
+        <div class="options{{ ' ox' if q.type == 'ox' }}">
+          {% for opt in q.options %}
+          <label class="option">
+            <input type="radio" name="answer" value="{{ opt }}" required>
+            <span>{{ opt }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </fieldset>
+    <button type="submit" class="btn primary">정답 확인</button>
+  </form>
+</div>

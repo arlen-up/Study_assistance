@@ -114,25 +114,6 @@
       {% endif %}
     </figure>
 
-    {# ---------- 5) 복습 현황 (한 줄로 나눈 막대) ---------- #}
-    <figure class="card chart">
-      <figcaption>
-        <h3 class="chart-title">복습 현황</h3>
-        <p class="muted xsmall">1일 → 3일 → 7일 간격 복습 · 교안 {{ ins.review_total }}개</p>
-      </figcaption>
-      {% if ins.review_total %}
-      <div class="segbar" role="img" aria-label="{% for p in ins.reviews %}{{ p.label }} {{ p.count }}개{{ ', ' if not loop.last }}{% endfor %}">
-        {% for p in ins.reviews if p.count %}
-        <span class="seg seg-{{ p.key }}" style="flex-grow: {{ p.count }}" tabindex="0" data-tip="{{ p.icon }} {{ p.label }} · {{ p.count }}개 ({{ p.pct | round | int }}%)">{% if p.pct >= 14 %}{{ p.count }}{% endif %}</span>
-        {% endfor %}
-      </div>
-      <ul class="legend">
-        {% for p in ins.reviews %}<li><span class="swatch seg-{{ p.key }}"></span>{{ p.icon }} {{ p.label }} {{ p.count }}개</li>{% endfor %}
-      </ul>
-      {% else %}
-      <p class="muted small">퀴즈를 풀면 복습 일정이 생겨요.</p>
-      {% endif %}
-    </figure>
   </div>
 {% endif %}
 </section>

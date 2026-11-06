@@ -64,8 +64,25 @@ def split_reviews(items: list[ReviewItem]) -> ReviewListResponse:
     return ReviewListResponse(due=due, upcoming=upcoming, mastered=mastered)
 
 
+async def _attach_course_names(db: AsyncClient, items: list[ReviewItem]) -> None:
+    """과목명을 붙인다. 과목명 조회가 실패해도 복습 목록은 그대로 보여 준다."""
+    ids = list({str(item.document_id) for item in items})
+    if not ids:
+        return
+    try:
+        res = await db.table("documents").select("id,course_name").in_("id", ids).execute()
+    except Exception:
+        logger.exception("과목명 조회 실패 (복습 목록은 과목명 없이 표시)")
+        return
+    names = {row["id"]: row.get("course_name") for row in res.data or []}
+    for item in items:
+        item.course_name = names.get(str(item.document_id))
+
+
 async def list_reviews(db: AsyncClient, user_id: UUID) -> ReviewListResponse:
-    return split_reviews(await _fetch(db, user_id))
+    items = await _fetch(db, user_id)
+    await _attach_course_names(db, items)
+    return split_reviews(items)
 
 
 async def get_review(db: AsyncClient, user_id: UUID, document_id: UUID) -> ReviewItem | None:

@@ -1,0 +1,22 @@
+{# 📝 기말 예상 문제: 문항 수와 요청을 정해서 만든다 #}
+<div class="bubble-row bot">
+  <article class="bubble bot wide" aria-label="기말 예상 문제 만들기">
+    <p class="xsmall muted">📝 기말 예상 문제</p>
+    <form class="stack" hx-post="/ui/exam" hx-target="#chat-log" hx-swap="beforeend scroll:#chat-log:bottom"
+          hx-disabled-elt="find button[type=submit]" hx-indicator="#exam-loading">
+      <input type="hidden" name="document_id" value="{{ document_id }}">
+      <label class="field">
+        <span>문항 수 (1~10)</span>
+        <input class="exam-range" type="range" name="count" min="1" max="10" value="5" aria-describedby="exam-count-help">
+      </label>
+      <p id="exam-count-help" class="muted xsmall">막대를 움직여 문항 수를 고르세요. 기본은 5문제예요.</p>
+      <label class="field">
+        <span>요청</span>
+        <input class="input" name="ask" maxlength="300" value="기말고사에 나올 만한 예상 문제를 만들어 줘">
+      </label>
+      <p class="muted xsmall">요청에 <strong>‘정답’</strong>이라는 말을 넣으면, 채점 결과에서 정답도 함께 보여 줘요.</p>
+      <button type="submit" class="btn primary">예상 문제 만들기</button>
+      <p id="exam-loading" class="htmx-indicator muted small"><span class="spinner"></span> 교안을 읽고 예상 문제를 만드는 중…</p>
+    </form>
+  </article>
+</div>

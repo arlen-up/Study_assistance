@@ -14,6 +14,7 @@ from supabase import AsyncClient
 
 from backend.core.errors import BadRequestError, NotFoundError, UpstreamError
 from backend.schemas.models import (
+    ExamQuestionDraft,
     Difficulty,
     PublicQuizQuestion,
     QuestionResult,
@@ -76,6 +77,49 @@ async def save_quiz(
     except Exception:
         logger.exception("quizzes insert 실패")
         raise UpstreamError("퀴즈 저장에 실패했습니다.") from None
+    return UUID(res.data[0]["id"])
+
+
+async def save_exam(
+    db: AsyncClient,
+    *,
+    user_id: UUID,
+    document_id: UUID,
+    questions: list[ExamQuestionDraft],
+    model_name: str,
+) -> UUID:
+    """기말 예상 문제를 서술형 문항으로 저장한다. 정답·모범 답안은 서버에만 둔다."""
+    items = [
+        {
+            "type": "short_answer",
+            "question": q.question,
+            "options": [],
+            "code": None,
+            "language": None,
+            "answer": q.answer,
+            "explanation": q.explanation,
+            "source_chunk_id": None,
+        }
+        for q in questions
+    ]
+    try:
+        res = (
+            await db.table("quizzes")
+            .insert(
+                {
+                    "user_id": str(user_id),
+                    "document_id": str(document_id),
+                    "keywords": [],
+                    "questions": items,
+                    "difficulty": "medium",
+                    "model_name": model_name,
+                }
+            )
+            .execute()
+        )
+    except Exception:
+        logger.exception("기말 예상 문제 저장 실패")
+        raise UpstreamError("예상 문제 저장에 실패했습니다.") from None
     return UUID(res.data[0]["id"])
 
 

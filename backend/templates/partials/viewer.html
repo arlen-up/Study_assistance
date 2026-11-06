@@ -13,7 +13,14 @@
             aria-label="교안 뷰어 닫기">닫기</button>
   </div>
 
-  {% if doc.has_pdf %}
+  {% if doc.has_pdf and doc.page %}
+    <figure class="pdf-page-figure">
+      <img class="pdf-page" src="/ui/viewer/{{ doc.id }}/page?page={{ doc.page }}&amp;q={{ doc.highlight_text | urlencode }}"
+           alt="{{ doc.title }} {{ doc.page }}쪽 (답변에 쓴 부분을 노란 상자로 표시)" loading="lazy">
+      <figcaption class="muted xsmall">📍 {{ doc.page }}쪽 · 답변에 쓴 부분은 노란 상자로 표시했어요</figcaption>
+    </figure>
+    <p class="muted xsmall"><a href="/ui/viewer/{{ doc.id }}/file#page={{ doc.page }}" target="_blank" rel="noopener">PDF 원본을 새 창에서 열기</a></p>
+  {% elif doc.has_pdf %}
     <iframe class="pdf-frame" src="/ui/viewer/{{ doc.id }}/file#page={{ doc.page or 1 }}" title="{{ doc.title }} PDF"></iframe>
     <p class="muted xsmall">PDF 원본이에요{% if doc.page %} · {{ doc.page }}쪽을 열었어요{% endif %}.
       <a href="/ui/viewer/{{ doc.id }}/file#page={{ doc.page or 1 }}" target="_blank" rel="noopener">새 창에서 크게 보기</a></p>
