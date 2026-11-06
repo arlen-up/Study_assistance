@@ -162,7 +162,7 @@ async def dashboard_page(
     username_state = await profile_service.get_state(db, user.id)
     try:
         dashboard = await study_service.get_dashboard(db, user.id)
-        documents = await study_service.list_documents(db)
+        documents = await study_service.list_documents(db, user.id)
     except AppError as exc:
         error = exc.message
     # 복습 알림(푸시)에서 들어오면 챗봇에 '퀴즈·카드 시작' 말풍선을 띄운다
@@ -212,7 +212,7 @@ async def _lms_context(db: AsyncClient, lms: LmsClient, user_id: UUID) -> dict[s
         if status.linked and status.student_id is not None:
             context["lms_assignments"] = await lms.list_open_assignments(status.student_id)
             context["lms_materials"] = await lms.list_student_materials(status.student_id)
-            context["imported_ids"] = await lms_link_service.imported_material_ids(db)
+            context["imported_ids"] = await lms_link_service.imported_material_ids(db, user_id)
     except AppError as exc:
         context["lms_error"] = exc.message
     return context
@@ -316,10 +316,13 @@ async def ui_chat(
 
 # 📝 기말 예상 문제: 문항 수·요청을 정해 만들고, 답을 적으면 AI가 의미로 채점한다
 @router.get("/ui/exam/new", response_class=HTMLResponse)
-async def ui_exam_new(request: Request, _user: WebUser, document_id: Annotated[str, Query()] = "") -> HTMLResponse:
+async def ui_exam_new(
+    request: Request, user: WebUser, db: DbDep, document_id: Annotated[str, Query()] = ""
+) -> HTMLResponse:
     doc_id = _parse_uuid(document_id)
     if doc_id is None:
         raise BadRequestError("예상 문제를 만들 교안을 골라 주세요.")
+    await study_service.require_document(db, user.id, doc_id)
     return _render(request, "partials/exam_new.html", {"document_id": doc_id})
 
 
@@ -609,7 +612,7 @@ async def ui_upload(
         text=text,
         file=file if file is not None and file.filename else None,
     )
-    documents = await study_service.list_documents(db)
+    documents = await study_service.list_documents(db, user.id)
     return _render(request, "partials/upload_result.html", {"result": result, "documents": documents, "oob": True})
 
 
@@ -644,7 +647,7 @@ async def ui_lms_import(
     lms: LmsDep,
 ) -> HTMLResponse:
     result = await lms_link_service.import_material(db, settings, lms, user.id, material_id)
-    documents = await study_service.list_documents(db)
+    documents = await study_service.list_documents(db, user.id)
     return _render(
         request,
         "partials/lms_import_result.html",
@@ -687,32 +690,33 @@ async def ui_lms_sync(request: Request, user: WebUser, db: DbDep, settings: Sett
 # 📄 교안 뷰어 (챗봇 옆 빈 공간)
 # ---------------------------------------------------------------------
 @router.get("/ui/viewer", response_class=HTMLResponse)
-async def ui_viewer_empty(request: Request, _user: WebUser, db: DbDep) -> HTMLResponse:
-    return _render(request, "partials/viewer_empty.html", {"documents": await study_service.list_documents(db)})
+async def ui_viewer_empty(request: Request, user: WebUser, db: DbDep) -> HTMLResponse:
+    return _render(request, "partials/viewer_empty.html", {"documents": await study_service.list_documents(db, user.id)})
 
 
 @router.get("/ui/viewer/{document_id}", response_class=HTMLResponse)
 async def ui_viewer(
     request: Request,
     document_id: UUID,
-    _user: WebUser,
+    user: WebUser,
     db: DbDep,
     chunk: Annotated[UUID | None, Query()] = None,
     page: Annotated[int | None, Query(ge=1, le=5000)] = None,
 ) -> HTMLResponse:
-    doc = await viewer_service.load(db, document_id, chunk, page)
+    doc = await viewer_service.load(db, user.id, document_id, chunk, page)
     return _render(request, "partials/viewer.html", {"doc": doc})
 
 
 @router.get("/ui/viewer/{document_id}/page")
 async def ui_viewer_page(
     document_id: UUID,
-    _user: WebUser,
+    user: WebUser,
     db: DbDep,
     page: Annotated[int, Query(ge=1, le=5000)],
     q: Annotated[str, Query(max_length=400)] = "",
 ) -> Response:
     """PDF 원본의 한 쪽을 그림으로 그리고, 답변에 쓴 문장 부분을 노란 상자로 표시한다."""
+    await study_service.require_document(db, user.id, document_id)  # 본인 교안만
     data = await file_store.load_pdf(db, document_id)
     if data is None:
         raise NotFoundError("이 교안은 PDF 원본이 보관되어 있지 않아요.")
@@ -725,8 +729,9 @@ async def ui_viewer_page(
 
 
 @router.get("/ui/viewer/{document_id}/file")
-async def ui_viewer_file(document_id: UUID, _user: WebUser, db: DbDep) -> Response:
+async def ui_viewer_file(document_id: UUID, user: WebUser, db: DbDep) -> Response:
     """보관된 PDF 원본. 같은 사이트의 뷰어(iframe) 안에서만 열리게 한다."""
+    await study_service.require_document(db, user.id, document_id)  # 본인 교안만
     data = await file_store.load_pdf(db, document_id)
     if data is None:
         raise NotFoundError("이 교안은 PDF 원본이 보관되어 있지 않아요.")

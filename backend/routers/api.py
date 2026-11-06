@@ -79,9 +79,10 @@ async def health() -> HealthResponse:
 # ---------------- 교안 ----------------
 @router.get("/documents", response_model=DocumentListResponse, tags=["documents"])
 async def list_documents(
-    _user: CurrentUser, db: DbDep, limit: Annotated[int, Query(ge=1, le=100)] = 30
+    user: CurrentUser, db: DbDep, limit: Annotated[int, Query(ge=1, le=100)] = 30
 ) -> DocumentListResponse:
-    return DocumentListResponse(documents=await study_service.list_documents(db, limit))
+    """내 교안만 (교안은 계정별로 나뉜다)."""
+    return DocumentListResponse(documents=await study_service.list_documents(db, user.id, limit))
 
 
 @router.post(
@@ -289,7 +290,7 @@ async def flashcards(body: FlashcardRequest, _user: CurrentUser, agent: ApiAgent
 
 @router.post("/flashcards/result", response_model=FlashcardResult, tags=["study-tools"])
 async def flashcards_result(body: FlashcardResultRequest, user: CurrentUser, db: DbDep) -> FlashcardResult:
-    await study_service.require_document(db, body.document_id)
+    await study_service.require_document(db, user.id, body.document_id)
     log_id = await study_tools_service.record_flashcard_session(
         db, user.id, body.document_id, body.known, body.total, body.duration_seconds
     )
