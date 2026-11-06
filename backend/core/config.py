@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     llm_base_url: str = "https://api.openai.com/v1"
     llm_chat_model: str = "gpt-6-luna"
     llm_embedding_model: str = "text-embedding-3-small"  # 1536차원
+    # 주 모델이 오류(장애·시간 초과·모델 없음 등)를 내면 차례로 바꿔 실행할 예비 모델 (쉼표로 구분, 비우면 끔)
+    llm_fallback_models: str = "gpt-5.6-luna,gpt-5.4-mini"
     # 추론 모델 설정. gpt-6-luna는 Chat Completions에서 함수 호출을 쓰려면 "none"이어야 한다.
     # 추론 기능이 없는 다른 OpenAI 호환 모델을 쓸 때는 빈 값으로 두면 요청에서 빠진다.
     llm_reasoning_effort: str | None = "none"
@@ -143,6 +145,11 @@ class Settings(BaseSettings):
     def auth_key(self) -> str:
         key = self.supabase_publishable_key or self.supabase_secret_key
         return key.get_secret_value()
+
+
+def fallback_model_names(settings: "Settings") -> list[str]:
+    names = [n.strip() for n in settings.llm_fallback_models.split(",") if n.strip()]
+    return [n for n in dict.fromkeys(names) if n != settings.llm_chat_model]  # 중복·주 모델 제외
 
 
 @lru_cache(maxsize=1)

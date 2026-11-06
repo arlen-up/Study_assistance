@@ -168,25 +168,41 @@ async def record_study_log(
     score: int,
     total: int,
     duration_seconds: int | None,
+    missed: list[dict[str, str]] | None = None,
 ) -> UUID:
-    """학습 완료 기록. DB 트리거가 users.last_studied_at도 함께 갱신한다."""
+    """학습 완료 기록. DB 트리거가 users.last_studied_at도 함께 갱신한다.
+
+    missed: 틀린 문제(질문·정답·해설) — 같은 교안의 다음 퀴즈에서 틀린 개념을 다시 묻는 데 쓴다 (적응형 학습).
+    """
+    row = {
+        "user_id": str(user_id),
+        "document_id": str(document_id),
+        "quiz_id": str(quiz_id) if quiz_id else None,
+        "score": score,
+        "total_questions": total,
+        "completed": True,
+        "duration_seconds": duration_seconds,
+    }
     try:
-        res = (
-            await db.table("study_logs")
-            .insert(
-                {
-                    "user_id": str(user_id),
-                    "document_id": str(document_id),
-                    "quiz_id": str(quiz_id) if quiz_id else None,
-                    "score": score,
-                    "total_questions": total,
-                    "completed": True,
-                    "duration_seconds": duration_seconds,
-                }
-            )
-            .execute()
-        )
+        res = await db.table("study_logs").insert({**row, "missed": missed} if missed else row).execute()
     except Exception:
-        logger.exception("study_logs insert 실패")
-        raise UpstreamError("학습 기록 저장에 실패했습니다.") from None
+        if not missed:
+            logger.exception("study_logs insert 실패")
+            raise UpstreamError("학습 기록 저장에 실패했습니다.") from None
+        # 틀린 문제 칸이 아직 없는 DB(마이그레이션 전)여도 학습 기록은 남긴다
+        logger.warning("틀린 문제 기록 실패 → 학습 기록만 저장", exc_info=True)
+        try:
+            res = await db.table("study_logs").insert(row).execute()
+        except Exception:
+            logger.exception("study_logs insert 실패")
+            raise UpstreamError("학습 기록 저장에 실패했습니다.") from None
     return UUID(res.data[0]["id"])
+
+
+def missed_items(questions: list[QuizQuestionDraft], results: list[QuestionResult]) -> list[dict[str, str]]:
+    """틀린 문제만 골라 다음 퀴즈에 쓸 형태로 (질문·정답·해설, 너무 길면 자름)."""
+    return [
+        {"question": q.question[:300], "answer": q.answer[:200], "explanation": (q.explanation or "")[:300]}
+        for q, r in zip(questions, results, strict=True)
+        if not r.correct
+    ]

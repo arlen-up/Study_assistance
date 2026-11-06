@@ -6,6 +6,7 @@
     <p>오늘의 잔디를 심었어요 🌱
     {% if result.review and result.review.next_review_at %}다음 복습은 <strong>{{ result.review.next_review_at | kst }}</strong> ({{ result.review.stage_label }})예요.
     {% elif result.review %}이 교안은 복습을 모두 마쳤어요!{% endif %}</p>
+    {% if result.score < result.total %}<p class="xsmall">🔁 틀린 개념은 기억해 두었다가 이 교안의 다음 퀴즈에서 다른 방식으로 다시 물어볼게요.</p>{% endif %}
   </div>
 
   <p class="muted xsmall">카드를 누르면 뒤집혀서 정답과 해설이 보여요. 이전·다음으로 넘겨 보세요.</p>

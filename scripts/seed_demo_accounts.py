@@ -475,10 +475,29 @@ def seed_logs(sb: httpx.Client, user_id: str, p: Profile, pools: dict[str, list[
     due_logs = [(keep_gap(e), due_1d), (keep_gap(e + 6), due_3d), (keep_gap(e + 2), due_3d)]
     logs += [(keep_gap(e + 8), upcoming), (keep_gap(e + 4), upcoming), (keep_gap(e + 1), upcoming)]
 
+    # 복습 간격은 퀴즈 성적으로 정해진다 (review_service.adaptive_next: 잘 풀면 1·3·7일, 3문제 중 1개 이하면 1일 뒤 다시).
+    # 의도한 복습 상태가 나오도록 점수를 정한다:
+    #   · 교안마다 최근 4번은 잘 푼 점수(2~3점) → 잔디용 교안은 '복습 완료', 예정 교안은 '7일 후'
+    #   · 그보다 오래된 기록은 가끔 1점 (정답률 그래프가 자연스럽게)
+    #   · 오늘 복습 ① 은 1점 → '다시 복습 (지난 퀴즈 1/3)' 로 적응형 복습을 보여 준다
+    entries = [*((log, False) for log in logs), *((log, True) for log in due_logs)]
+    recent_rank: dict[int, int] = {}
+    seen_per_doc: dict[str, int] = {}
+    for idx in sorted(range(len(entries)), key=lambda i: entries[i][0][0]):  # 최근 기록부터
+        doc = entries[idx][0][1]
+        recent_rank[idx] = seen_per_doc.get(doc, 0)
+        seen_per_doc[doc] = recent_rank[idx] + 1
+
+    def score_of(idx: int) -> int:
+        doc = entries[idx][0][1]
+        if doc == due_1d:
+            return 1
+        return rng.choice([2, 3, 3]) if recent_rank[idx] < 4 else rng.choice([1, 2, 3, 3])
+
     rows = [
-        {"user_id": user_id, "document_id": doc_id, "score": rng.choice([1, 2, 3, 3]), "total_questions": 3,
+        {"user_id": user_id, "document_id": doc_id, "score": score_of(i), "total_questions": 3,
          "completed": True, "duration_seconds": rng.randint(90, 240), "studied_at": at(days_ago, early)}
-        for (days_ago, doc_id), early in [*((log, False) for log in logs), *((log, True) for log in due_logs)]
+        for i, ((days_ago, doc_id), early) in enumerate(entries)
     ]
     check(sb.post("/rest/v1/study_logs", json=rows, headers={"Prefer": "return=minimal"}), "학습 기록 넣기")
     last = max(r["studied_at"] for r in rows)
