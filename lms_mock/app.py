@@ -2,9 +2,14 @@
 
 두 개의 '가상 학교 시스템'을 제공한다.
   🏫 가상 코스모스 (Moodle 4.5 Web Services 호환)  → /lms/webservice/rest/server.php
-       수강 과목 · 과제/마감일 · 과제 제출 · 강의 자료 · 과목 성적   (wstoken 인증)
+       수강 과목 · 과제/마감일 · 과제 제출 · 강의 자료 · 과목 성적   (학생 전용 토큰)
+     + 학교 계정 연결 (OAuth 2.0 + PKCE)             → /lms/oauth/authorize · token · revoke
   🏛 가상 학사정보시스템 (자체 REST API)            → /lms/api/*
-       학생 · 전체 성적표 · 졸업 요건 · 과목 카탈로그 · 시연 학생 · WS 토큰 발급   (X-LMS-API-Key 인증)
+       내 정보 · 내 성적표                            (학생 전용 토큰, Bearer)
+       과목 카탈로그 · 졸업 요건 (학교 공통 정보)     (서버 간 키 X-LMS-API-Key)
+
+학생 개인 정보는 학생이 학교에 로그인해 동의한 토큰으로만 읽을 수 있다.
+서버 간 키로 아무 학생의 정보·토큰을 꺼내는 기능은 없다 (예전 /api/students/{id}/ws-token 삭제).
 
 실제 학교에서는 코스모스(LMS)와 학사정보시스템(포털)이 별개 시스템이므로 여기서도 나눈다.
 Swagger 문서: /lms/api/docs
@@ -12,28 +17,25 @@ Swagger 문서: /lms/api/docs
 
 import logging
 from typing import Annotated
-from uuid import UUID
 
 from fastapi import FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from lms_mock import __version__, moodle, repository
-from lms_mock.auth import ApiKeyDep, LmsSettingsDep
+from lms_mock import __version__, moodle, oauth, repository
+from lms_mock.auth import ApiKeyDep
 from lms_mock.config import LmsConfigError, get_lms_settings
 from lms_mock.errors import LmsError
 from lms_mock.repository import LmsDbDep
 from lms_mock.schemas import (
     CourseCategory,
     CourseList,
-    DemoStudentRequest,
-    DemoStudentResponse,
     GraduationRequirement,
     LmsHealth,
     Student,
     Transcript,
-    WsToken,
 )
+from lms_mock.student_auth import StudentToken, require_student_token
 
 logger = logging.getLogger("lms_mock")
 
@@ -70,8 +72,9 @@ def create_lms_app() -> FastAPI:
         logger.exception("가상 LMS 처리되지 않은 오류", exc_info=exc)
         return JSONResponse(status_code=500, content={"error": {"code": "internal_error", "message": "LMS 서버 오류"}})
 
-    # 🏫 가상 코스모스 (Moodle Web Services REST)
+    # 🏫 가상 코스모스 (Moodle Web Services REST) + 학교 계정 연결 (OAuth 2.0)
     app.include_router(moodle.router)
+    app.include_router(oauth.router)
 
     # ---------------- 🏛 가상 학사정보시스템 ----------------
     @app.get("/api/health", response_model=LmsHealth, tags=["system"])
@@ -82,15 +85,14 @@ def create_lms_app() -> FastAPI:
             configured = False
         return LmsHealth(status="ok" if configured else "degraded", configured=configured, version=__version__)
 
-    @app.get("/api/students/{student_id}", response_model=Student, dependencies=[ApiKeyDep], tags=["학사정보"])
-    async def get_student(student_id: UUID, db: LmsDbDep) -> Student:
-        return await repository.get_student(db, student_id)
+    @app.get("/api/me", response_model=Student, tags=["학사정보"])
+    async def get_me(db: LmsDbDep, me: StudentToken = require_student_token("academic.read")) -> Student:
+        """토큰 주인 학생의 정보 (학생 ID를 주소로 받지 않으므로 남의 정보를 요청할 방법이 없다)."""
+        return await repository.get_student(db, me.student_id)
 
-    @app.get(
-        "/api/students/{student_id}/transcript", response_model=Transcript, dependencies=[ApiKeyDep], tags=["학사정보"]
-    )
-    async def get_transcript(student_id: UUID, db: LmsDbDep) -> Transcript:
-        return await repository.get_transcript(db, student_id)
+    @app.get("/api/me/transcript", response_model=Transcript, tags=["학사정보"])
+    async def get_my_transcript(db: LmsDbDep, me: StudentToken = require_student_token("academic.read")) -> Transcript:
+        return await repository.get_transcript(db, me.student_id)
 
     @app.get("/api/courses", response_model=CourseList, dependencies=[ApiKeyDep], tags=["학사정보"])
     async def list_courses(db: LmsDbDep, category: Annotated[CourseCategory | None, Query()] = None) -> CourseList:
@@ -104,25 +106,6 @@ def create_lms_app() -> FastAPI:
     )
     async def get_graduation_requirement(department: str, db: LmsDbDep) -> GraduationRequirement:
         return await repository.get_graduation_requirement(db, department)
-
-    @app.get(
-        "/api/students/{student_id}/ws-token", response_model=WsToken, dependencies=[ApiKeyDep], tags=["시연용"]
-    )
-    async def issue_ws_token(student_id: UUID, db: LmsDbDep, settings: LmsSettingsDep) -> WsToken:
-        """가상 코스모스(Moodle) Web Service 토큰 발급. 진짜 학교에서는 학교가 학생별로 발급한다."""
-        await repository.get_student(db, student_id)
-        return WsToken(token=moodle.ws_token(settings, student_id))
-
-    @app.post(
-        "/api/demo/students",
-        response_model=DemoStudentResponse,
-        status_code=201,
-        dependencies=[ApiKeyDep],
-        tags=["시연용"],
-    )
-    async def create_demo_student(body: DemoStudentRequest, db: LmsDbDep) -> DemoStudentResponse:
-        """시연용 학생과 수강 이력·과제를 만든다 (같은 학번이면 갱신)."""
-        return DemoStudentResponse(student_id=await repository.seed_demo_student(db, body.student_no, body.name))
 
     return app
 

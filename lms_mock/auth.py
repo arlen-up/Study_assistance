@@ -1,4 +1,8 @@
-"""서버 간 인증: 도우미가 보낸 X-LMS-API-Key 헤더를 확인한다."""
+"""가상 학교 시스템의 인증.
+
+- X-LMS-API-Key : 서버 간 인증. 과목 목록·졸업 요건처럼 **학교 공통 정보**만 읽을 수 있다 (학생 개인 정보 X).
+- Bearer 토큰   : 학생이 학교 계정으로 로그인해 동의하면 받는 학생 전용 토큰 (OAuth 2.0). 개인 정보는 이것으로만.
+"""
 
 import hmac
 from typing import Annotated
@@ -31,3 +35,4 @@ def require_api_key(
 
 
 ApiKeyDep = Depends(require_api_key)
+

@@ -10,12 +10,12 @@
   - webservice/externallib.php   : core_webservice_get_site_info
 
 경로: /lms/webservice/rest/server.php  (진짜 코스모스로 바꿀 때는 도우미의 MOODLE_BASE_URL만 교체)
-토큰: 학생마다 고정된 32자리 토큰 (가상 학사정보 API의 /api/students/{id}/ws-token 으로 발급).
+토큰: 학생이 학교 계정으로 로그인해 동의하면 발급되는 학생 전용 32자리 토큰 (OAuth 2.0, lms_mock/oauth.py).
+      DB에는 해시만 저장하고, 토큰마다 권한 범위(scope)·만료·폐기가 있다. 서버 키로 토큰을 만들 수 없다.
 """
 
 import datetime as dt
 import hashlib
-import hmac
 import html
 import logging
 import re
@@ -28,10 +28,9 @@ from fastapi.responses import JSONResponse
 from supabase import AsyncClient
 
 from lms_mock import repository
-from lms_mock.auth import LmsSettingsDep
-from lms_mock.config import LmsSettings
 from lms_mock.errors import LmsError
 from lms_mock.repository import LmsDbDep
+from lms_mock.security import sha256_hex
 from lms_mock.schemas import CourseRecord, Transcript
 
 logger = logging.getLogger("lms_mock.moodle")
@@ -80,11 +79,12 @@ def uuid_int(value: str | UUID, kind: str) -> int:
     return int(digest[:8], 16) % 2_000_000_000 + 1
 
 
-def ws_token(settings: LmsSettings, student_id: UUID) -> str:
-    if settings.lms_api_key is None:
-        raise LmsError(503, "lms_not_configured", "가상 LMS 연동 키(LMS_API_KEY)가 설정되지 않았습니다.")
-    key = settings.lms_api_key.get_secret_value().encode()
-    return hmac.new(key, f"moodle-ws:{student_id}".encode(), hashlib.sha256).hexdigest()[:32]
+# 함수마다 필요한 권한. 목록에 없는 함수는 읽기 권한(lms.read)이 필요하다.
+FUNCTION_SCOPES: dict[str, str] = {"mod_assign_submit_for_grading": "lms.submit"}
+
+
+def required_scope(function: str) -> str:
+    return FUNCTION_SCOPES.get(function, "lms.read")
 
 
 def _epoch(value: str | dt.datetime | None) -> int:
@@ -488,17 +488,18 @@ def _error(exc: MoodleError) -> JSONResponse:
     return JSONResponse({"exception": exc.exception, "errorcode": exc.errorcode, "message": exc.message})
 
 
-async def _resolve_token(db: AsyncClient, settings: LmsSettings, token: str | None) -> UUID:
+async def _resolve_token(db: AsyncClient, token: str | None) -> tuple[UUID, set[str]]:
+    """토큰 → (학생 ID, 권한 범위). 해시로 찾고, 폐기·만료된 토큰은 거절한다."""
     if not token or not re.fullmatch(r"[0-9a-f]{32}", token):
         raise MoodleError("invalidtoken", "Invalid token - token not found")
-    for student_id in await repository.list_student_ids(db):
-        if hmac.compare_digest(ws_token(settings, student_id), token):
-            return student_id
-    raise MoodleError("invalidtoken", "Invalid token - token not found")
+    row = await repository.find_token(db, sha256_hex(token))
+    if row is None:
+        raise MoodleError("invalidtoken", "Invalid token - token not found")
+    return UUID(row["student_id"]), set(str(row["scope"]).split())
 
 
 @router.api_route("/webservice/rest/server.php", methods=["GET", "POST"], tags=["moodle"])
-async def rest_server(request: Request, db: LmsDbDep, settings: LmsSettingsDep) -> JSONResponse:
+async def rest_server(request: Request, db: LmsDbDep) -> JSONResponse:
     raw: dict[str, str] = dict(request.query_params)
     if request.method == "POST":
         form = await request.form()
@@ -515,7 +516,7 @@ async def rest_server(request: Request, db: LmsDbDep, settings: LmsSettingsDep) 
     token = raw.pop("wstoken", None)
     function = raw.pop("wsfunction", None)
     try:
-        student_id = await _resolve_token(db, settings, token)
+        student_id, scopes = await _resolve_token(db, token)
         handler = FUNCTIONS.get(function or "")
         if handler is None:
             raise MoodleError(
@@ -523,6 +524,9 @@ async def rest_server(request: Request, db: LmsDbDep, settings: LmsSettingsDep) 
                 "Can't find data record in database table external_functions.",
                 "dml_missing_record_exception",
             )
+        if required_scope(function or "") not in scopes:
+            # 학생이 동의하지 않은 기능 (예: 읽기 권한만 받은 토큰으로 과제 제출)
+            raise MoodleError("accessexception", "Access control exception", "webservice_access_exception")
         result = await handler(MoodleContext(db, student_id), parse_moodle_params(raw))
     except MoodleError as exc:
         return _error(exc)

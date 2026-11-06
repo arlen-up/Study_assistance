@@ -122,7 +122,7 @@ async def load_inputs(
     db: AsyncClient, lms: LmsClient, user_id: UUID, job_role: str | None = None
 ) -> CareerInputs:
     """LMS(성적표·졸업요건·과목)와 도우미(직무 트랙·관심 직무) 데이터를 모은다."""
-    student_id = await lms_link_service.require_student_id(db, user_id)
+    student_id = await lms_link_service.require_student_id(db, user_id, lms)
     transcript = await lms.get_transcript(student_id)
     requirement = await lms.get_graduation_requirement(transcript.student.department)
     catalog = await lms.list_courses()

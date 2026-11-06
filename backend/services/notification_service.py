@@ -77,7 +77,7 @@ async def gather_reminder_inputs(db: AsyncClient, lms: LmsClient, user_id: UUID)
     streak, pet_name, student_id, reviews = await asyncio.gather(
         streak_service.get_streak(db, user_id, 30),
         study_service.get_pet_name(db, user_id),
-        lms_link_service.get_student_id(db, user_id),
+        lms_link_service.get_student_id(db, user_id, lms),
         review_service.list_reviews(db, user_id),
     )
     assignments: list[LmsAssignment] = []
@@ -197,8 +197,9 @@ async def notify_user(db: AsyncClient, settings: Settings, lms: LmsClient, user_
 async def run_daily(db: AsyncClient, settings: Settings, lms: LmsClient) -> CronSummary:
     """매일 Cron: LMS 연결 학생 자동 동기화 + 구독자에게 알림."""
     started = time.monotonic()
-    linked_res = await db.table("users").select("id,lms_student_id").execute()
-    linked = {UUID(r["id"]) for r in linked_res.data or [] if r.get("lms_student_id")}
+    linked_res = await db.table("users").select("id,lms_student_id,lms_token_enc").execute()
+    # 학교 계정으로 연결해 학생 전용 토큰이 있는 사용자만 (각자 자기 토큰으로 동기화)
+    linked = {UUID(r["id"]) for r in linked_res.data or [] if r.get("lms_student_id") and r.get("lms_token_enc")}
     subscribed = await push_service.subscribed_user_ids(db) if settings.push_enabled else set()
     users = sorted(linked | subscribed, key=str)
 
