@@ -1,10 +1,10 @@
-{# 📧 메일 알림 미리보기 — 실제로 보내지 않고, 오늘 저녁 메일이 어떤 모습인지 보여준다.
+{# 📧 오늘 메일 미리보기 — 보내지 않고, 오늘 저녁 메일이 어떤 모습인지 보여준다.
    메일 본문은 email_service가 만든 HTML을 sandbox iframe(srcdoc)에 넣어 그대로 보여준다.
    (스크립트 실행 금지, 링크는 새 탭으로만 열림) #}
 <div class="email-preview" role="region" aria-label="메일 알림 미리보기">
   <div class="email-preview-head">
-    <span class="badge warning">미리보기</span>
-    <span class="muted xsmall">추가 개발 예정 · 실제 발송은 메일 서비스 연결 후</span>
+    <span class="badge secondary">미리보기</span>
+    <span class="muted xsmall">보내지 않아요 · 오늘 저녁 8시에 가는 메일 모습</span>
     <button type="button" class="email-preview-close" aria-label="미리보기 닫기"
             onclick="this.closest('.email-preview').remove()">✕</button>
   </div>
@@ -19,5 +19,5 @@
     <summary class="xsmall">텍스트 버전 보기</summary>
     <pre>{{ email.text }}</pre>
   </details>
-  <p class="muted xsmall">푸시 알림과 같은 규칙(마감 임박 과제 → 복습할 교안 → 연속 학습 위기)으로 내용을 골랐어요.</p>
+  <p class="muted xsmall">매일 저녁 메일과 같은 규칙(마감 임박 과제 → 복습할 교안 → 연속 학습 위기)으로 내용을 골랐어요.</p>
 </div>

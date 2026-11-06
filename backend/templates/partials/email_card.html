@@ -1,0 +1,37 @@
+{# 📧 메일 알림 — LSSA의 유일한 알림 방법 (웹 푸시·카카오톡은 쓰지 않는다).
+   매일 저녁 8시, 받기를 켠 학생에게 가장 급한 알림 하나를 메일로 보낸다. #}
+<section id="email-card" class="card email-card" aria-labelledby="email-card-title">
+  <h2 class="card-title" id="email-card-title">📧 메일 알림</h2>
+  <p class="muted small">매일 저녁 8시에 <strong>마감 임박 과제 → 오늘 복습할 교안 → 연속 학습 위기</strong> 중 가장 급한 하나를 메일로 보내요. 하루에 한 번만 와요.</p>
+
+  {% if email_notice %}
+  <div class="alert {{ 'danger' if email_error else 'info' }} small" role="{{ 'alert' if email_error else 'status' }}">{{ email_notice }}</div>
+  {% endif %}
+  {% if not email_ready %}
+  <div class="alert warning small" role="status">메일 발송 계정이 아직 설정되지 않아 지금은 보낼 수 없어요.</div>
+  {% endif %}
+
+  <form class="stack email-form" hx-post="/ui/notify/email-settings" hx-target="#email-card" hx-swap="outerHTML"
+        hx-disabled-elt="find button[type=submit]" hx-disinherit="hx-disabled-elt">
+    <label class="switch-row">
+      <input type="checkbox" name="enabled" value="1"{% if email_prefs.enabled %} checked{% endif %}>
+      <span>메일 알림 받기</span>
+      <span class="badge {{ 'success' if email_prefs.enabled else 'secondary' }}">{{ '켜짐' if email_prefs.enabled else '꺼짐' }}</span>
+    </label>
+    <label class="field">
+      <span>받을 메일</span>
+      <input class="input" type="email" name="alert_email" maxlength="254" autocomplete="email"
+             value="{{ email_prefs.alert_email or '' }}" placeholder="{{ email_prefs.account_email or 'name@example.com' }}">
+    </label>
+    <p class="muted xsmall">비워 두면 가입한 메일{% if email_prefs.account_email %}({{ email_prefs.account_email }}){% endif %}로 보내요.</p>
+    <div class="row email-actions">
+      <button type="submit" class="btn primary sm">저장</button>
+      <button type="button" class="btn outline sm" hx-post="/ui/notify/email-test" hx-target="#email-card"
+              hx-swap="outerHTML" hx-disabled-elt="this"{% if not email_ready or not email_prefs.recipient %} disabled{% endif %}>테스트 메일 보내기</button>
+      <button type="button" class="btn outline sm" hx-get="/ui/notify/email-preview" hx-target="#email-preview-area"
+              hx-swap="innerHTML">오늘 메일 미리보기</button>
+    </div>
+    <p class="muted xsmall">테스트 메일은 하루 {{ email_test_limit }}번까지 보낼 수 있어요.</p>
+  </form>
+  <div id="email-preview-area"></div>
+</section>

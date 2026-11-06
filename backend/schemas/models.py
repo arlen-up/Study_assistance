@@ -432,27 +432,6 @@ class PetStatus(BaseModel):
     progress_percent: int = 0
 
 
-class PushKeys(RequestModel):
-    p256dh: str = Field(min_length=40, max_length=200, pattern=r"^[A-Za-z0-9_\-=]+$")
-    auth: str = Field(min_length=10, max_length=64, pattern=r"^[A-Za-z0-9_\-=]+$")
-
-
-class PushSubscriptionIn(RequestModel):
-    endpoint: str = Field(min_length=20, max_length=2048, pattern=r"^https://")
-    keys: PushKeys
-    expirationTime: int | None = None  # noqa: N815 (브라우저 PushSubscription.toJSON() 필드명)
-
-
-class PushUnsubscribeIn(RequestModel):
-    endpoint: str = Field(min_length=20, max_length=2048, pattern=r"^https://")
-
-
-class PushResult(BaseModel):
-    ok: bool
-    delivered: int = 0
-    message: str
-
-
 class CronSummary(BaseModel):
     users: int
     synced: int

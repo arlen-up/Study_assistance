@@ -31,6 +31,12 @@ def is_https(request: Request) -> bool:
     return request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
 
 
+def public_base_url(request: Request) -> str:
+    """메일 속 링크에 쓸 사이트 주소 (배포 환경의 프록시 뒤에서도 https 로)."""
+    base = str(request.base_url)
+    return "https://" + base.split("://", 1)[1] if is_https(request) else base
+
+
 def set_session_cookies(response: Response, request: Request, session: Session) -> None:
     secure = is_https(request)
     response.set_cookie(

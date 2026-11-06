@@ -1,19 +1,29 @@
-"""📧 메일 알림 — 지금은 '미리보기'만 (추가 개발 예정).
+"""📧 메일 알림 — LSSA의 유일한 알림 방법 (웹 푸시·카카오톡은 쓰지 않는다).
 
-매일 저녁 푸시와 같은 재료(notification_service.gather_reminder_inputs)와 같은 선택 규칙(choose_reminder)으로
-'오늘 보낼 메일'의 제목·HTML·텍스트를 만든다. 실제 발송(SMTP, 메일 발송 서비스)은 연결하지 않았다.
-나중에 발송을 붙일 때는 EmailMessage를 그대로 보내면 된다. (카카오톡 알림톡도 같은 재료로 확장 가능)
+매일 저녁 Cron이 학생마다 같은 재료(notification_service.gather_reminder_inputs)와 같은 선택 규칙
+(choose_reminder: 마감 임박 과제 → 오늘 복습 → 연속 학습 위기)으로 '오늘 메일'을 만들어 Gmail SMTP로 보낸다.
+  - 보내는 계정: GMAIL_ADDRESS + GMAIL_APP_PASSWORD (Google '앱 비밀번호', 알림 전용 계정 권장)
+  - 받는 사람: 메일 알림을 직접 켠 학생만 (users.email_alerts), 주소는 users.alert_email 또는 가입 메일
 
 🔒 보안
 - HTML은 자동 이스케이프 템플릿으로 만든다 (과제·교안 제목에 태그가 있어도 글자로만 보임).
 - 메일 속 링크는 우리 사이트의 경로('/...')만 붙인다 (다른 사이트로 보내는 링크 금지).
 """
 
+import asyncio
 import datetime as dt
+import logging
+import smtplib
+import ssl
 from dataclasses import dataclass, replace
+from email.message import EmailMessage as MimeMessage
+from email.utils import formataddr, make_msgid
 from urllib.parse import urljoin
 
 from jinja2 import Environment
+
+from backend.core.config import Settings
+from backend.core.errors import AppError
 
 from backend.integrations.lms_client import LmsAssignment
 from backend.services.notification_service import (
@@ -23,7 +33,9 @@ from backend.services.notification_service import (
     urgent_assignments,
 )
 
+logger = logging.getLogger(__name__)
 KST = dt.timezone(dt.timedelta(hours=9))
+SMTP_TIMEOUT_SECONDS = 15
 SENDER_NAME = "LSSA"
 MAX_ITEMS = 3
 
@@ -109,7 +121,7 @@ _HTML = _env.from_string(
   {% endfor %}
   <tr><td style="padding:0 24px 20px;font-size:13px;color:#3f3f46;">{{ m.pet_line }}</td></tr>
   <tr><td style="padding:14px 24px;background:#fafafa;border-top:1px solid #e4e4e7;border-radius:0 0 14px 14px;font-size:11px;color:#a1a1aa;line-height:1.6;">
-    알림은 하루에 한 번만 보내요. 대시보드에서 알림 방법을 바꿀 수 있어요.
+    알림은 하루에 한 번만 보내요. 그만 받으려면 LSSA 대시보드의 '📧 메일 알림'에서 끄면 돼요.
   </td></tr>
 </table>
 </td></tr></table>
@@ -122,7 +134,7 @@ def _text_version(m: EmailMessage, title: str) -> str:
     for section, items in (("[마감이 다가오는 과제]", m.assignments), ("[오늘 복습할 교안]", m.reviews)):
         if items:
             lines += ["", section, *(f"- {i.title} ({i.detail})" for i in items)]
-    lines += ["", m.pet_line, "", "알림은 하루에 한 번만 보내요."]
+    lines += ["", m.pet_line, "", "알림은 하루에 한 번만 보내요. 그만 받으려면 LSSA 대시보드의 '메일 알림'에서 끄면 돼요."]
     return "\n".join(lines)
 
 
@@ -190,3 +202,54 @@ def build_daily_email(
         reminder_kind=reminder.kind if reminder else None,
     )
     return replace(draft, html=_HTML.render(m=draft, title=heading), text=_text_version(draft, heading))
+
+
+# ---------------------------------------------------------------------
+# 보내기 (Gmail SMTP)
+# ---------------------------------------------------------------------
+class EmailNotConfiguredError(AppError):
+    status_code = 503
+    code = "email_not_configured"
+
+
+class EmailSendError(AppError):
+    status_code = 502
+    code = "email_send_failed"
+
+
+def _mime(settings: Settings, m: EmailMessage, to: str, *, test: bool = False) -> MimeMessage:
+    msg = MimeMessage()
+    msg["From"] = formataddr((SENDER_NAME, settings.gmail_address or ""))
+    msg["To"] = to
+    msg["Subject"] = f"[테스트] {m.subject}" if test else m.subject
+    msg["Message-ID"] = make_msgid(domain=(settings.gmail_address or "lssa").split("@")[-1])
+    msg.set_content(m.text)
+    msg.add_alternative(m.html, subtype="html")
+    return msg
+
+
+def _send_sync(settings: Settings, msg: MimeMessage) -> None:
+    password = settings.gmail_app_password.get_secret_value().replace(" ", "") if settings.gmail_app_password else ""
+    context = ssl.create_default_context()
+    with smtplib.SMTP_SSL(settings.smtp_host, settings.smtp_port, context=context, timeout=SMTP_TIMEOUT_SECONDS) as s:
+        s.login(settings.gmail_address or "", password)
+        s.send_message(msg)
+
+
+async def send(settings: Settings, m: EmailMessage, to: str, *, test: bool = False) -> None:
+    """만든 메일을 Gmail로 보낸다. 실패하면 EmailSendError (비밀번호·주소는 로그에 남기지 않는다)."""
+    if not settings.email_enabled:
+        raise EmailNotConfiguredError("메일 발송 계정(GMAIL_ADDRESS·GMAIL_APP_PASSWORD)이 설정되지 않았어요.")
+    try:
+        await asyncio.to_thread(_send_sync, settings, _mime(settings, m, to, test=test))
+    except smtplib.SMTPAuthenticationError:
+        logger.error("Gmail 로그인 실패 — 앱 비밀번호 확인 필요")
+        raise EmailSendError("메일 계정 로그인에 실패했어요. 서버의 Gmail 앱 비밀번호를 확인해 주세요.") from None
+    except smtplib.SMTPServerDisconnected:
+        logger.error("Gmail이 연결을 끊음 — 앱 비밀번호(16자리) 확인 필요")
+        raise EmailSendError("메일 서버가 연결을 끊었어요. 서버의 Gmail 앱 비밀번호(16자리)를 확인해 주세요.") from None
+    except smtplib.SMTPRecipientsRefused:
+        raise EmailSendError("받는 메일 주소를 확인해 주세요.", code="email_bad_recipient", status_code=400) from None
+    except (smtplib.SMTPException, OSError) as exc:
+        logger.warning("메일 발송 실패: %s", type(exc).__name__)
+        raise EmailSendError("메일을 보내지 못했어요. 잠시 뒤 다시 시도해 주세요.") from None

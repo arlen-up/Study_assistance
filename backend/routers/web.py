@@ -27,6 +27,7 @@ from backend.core.errors import AppError, BadRequestError, NotFoundError
 from backend.core.supabase_client import DbDep, SettingsDep
 from backend.integrations.lms_client import LmsClient, LmsDep
 from backend.routers.deps import WebAgentDep
+from backend.routers.notify import email_card_context
 from backend.schemas.models import ChatRequest, ChatTurn, DashboardResponse, Difficulty, DocumentItem, RouteType
 from backend.services import (
     career_service,
@@ -199,7 +200,7 @@ async def dashboard_page(
             **await _lms_context(db, lms, user.id),
             "lms_notice": LMS_RESULT_MESSAGES.get(lms_result or ""),
             **await _career_context(db, user.id),
-            "vapid_public_key": settings.vapid_public_key if settings.push_enabled else None,
+            **await email_card_context(db, settings, user.id),
         },
     )
 
