@@ -18,7 +18,8 @@
   1. Supabase 로그인 계정 만들기(이메일 인증 완료) — 이미 있으면 비밀번호만 새로 정함
   2. 가상 학교 시스템(lms_*)에 학생을 고정 학번(2026900001~5)으로 만들고, 수강 이력을 통째로 교체
      + 과목별 과제를 만들거나 마감일을 '지금' 기준으로 다시 맞추고, 계정마다 제출한 과제를 다르게 넣음
-  3. 도우미 users 행에 학교 계정 연결·이수 학점·관심 직무·펫 이름 저장
+  3. 도우미 users 행에 학교 계정 연결·이수 학점·관심 직무·펫 이름·사용자 이름(학생 이름) 저장
+     → 시연 계정은 '처음 이름 정하기' 창이 뜨지 않아요 (사용자 이름 마이그레이션 20261106030000 필요)
   4. 학습 기록(잔디·복습 일정)을 계정마다 다른 모양으로 새로 채움 (오늘은 비워 둠)
 
 실행
@@ -490,7 +491,7 @@ def main() -> None:
             earned = credit_summary(sb, student_id)
             completed = sum(earned.values())
             check(sb.patch("/rest/v1/users", params={"id": f"eq.{user_id}"}, json={
-                "display_name": p.name, "target_job": p.target_job, "pet_name": p.pet_name,
+                "display_name": p.name, "username": p.name, "target_job": p.target_job, "pet_name": p.pet_name,
                 "lms_student_id": student_id, "completed_credits": completed,
                 "lms_synced_at": dt.datetime.now(dt.UTC).isoformat(),
             }), "도우미 사용자 정보 저장")

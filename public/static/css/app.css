@@ -161,6 +161,17 @@ h1, h2, h3, h4 { margin: 0; }
 
 /* ---------- 로그인 ---------- */
 .login-card { width: 100%; max-width: 380px; display: grid; gap: 16px; }
+/* 처음 들어온 사용자의 이름 설정 창 */
+.modal-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 16px; background: rgba(15, 23, 42, .45); backdrop-filter: blur(3px); }
+.modal-card { width: 100%; max-width: 400px; display: grid; gap: 16px; padding: 24px; box-shadow: 0 20px 50px rgba(15, 23, 42, .25); }
+.modal-head { display: grid; gap: 6px; text-align: center; }
+.modal-head h2 { font-size: 1.12rem; word-break: keep-all; }
+.modal-head p { word-break: keep-all; text-wrap: balance; }
+.modal-emoji { font-size: 2rem; line-height: 1; }
+.username-hint { min-height: 1.3em; font-size: .8rem; font-weight: 600; margin-top: -6px; }
+.hint-ok { color: var(--success-text); }
+.hint-bad { color: var(--danger); }
+.user-name { color: var(--text); font-weight: 700; }
 .login-head { text-align: center; display: grid; gap: 4px; }
 .login-head h1 { font-size: 1.25rem; }
 .login-head .tagline { font-size: .8rem; color: var(--muted); line-height: 1.45; margin-bottom: 6px; word-break: keep-all; text-wrap: balance; }

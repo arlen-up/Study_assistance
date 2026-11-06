@@ -1,0 +1,11 @@
+{# 처음 들어온 사용자: 이름을 정하기 전까지 뒤쪽 화면은 누를 수 없다 (header·main 에 inert) #}
+<div class="modal-backdrop">
+  <section class="card modal-card" role="dialog" aria-modal="true" aria-labelledby="username-title" aria-describedby="username-desc">
+    <div class="modal-head">
+      <span class="modal-emoji" aria-hidden="true">👋</span>
+      <h2 id="username-title">반가워요! 사용할 이름을 정해 주세요</h2>
+      <p id="username-desc" class="muted small">화면 위쪽에 이 이름이 보여요. 다른 사람과 같은 이름은 쓸 수 없어요.</p>
+    </div>
+    {% include "partials/username_form.html" %}
+  </section>
+</div>
