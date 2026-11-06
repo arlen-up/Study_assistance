@@ -1,0 +1,21 @@
+{# 문제 하나의 채점 결과: 정답·해설을 보여 주고, 다음 문제(또는 결과 보기)로 넘어간다 #}
+<div class="quiz-box" id="quiz-{{ quiz_id }}">
+  <form class="stack quiz-slide" hx-post="{{ '/ui/quiz/' ~ quiz_id ~ ('/finish' if is_last else '/slide') }}"
+        hx-target="#quiz-{{ quiz_id }}" hx-swap="outerHTML" hx-disabled-elt="find button[type=submit]">
+    <input type="hidden" name="index" value="{{ index + 1 }}">
+    <input type="hidden" name="answers_json" value="{{ answers_json }}">
+    <input type="hidden" name="started_at" value="{{ started_at }}">
+    <p class="slide-progress muted small">문제 {{ index + 1 }} / {{ total }}</p>
+    <div class="alert {{ 'success' if correct else 'danger' }}" role="status">
+      <strong>{{ '⭕ 정답이에요!' if correct else '❌ 아쉬워요' }}</strong>
+      <p class="xsmall">내 답: {{ your_answer }}</p>
+    </div>
+    <div class="quiz-explain">
+      <p class="xsmall muted">정답</p>
+      <p class="flash-answer mono">{{ q.answer }}</p>
+      <p class="xsmall muted">해설</p>
+      <p class="pre">{{ q.explanation }}</p>
+    </div>
+    <button type="submit" class="btn primary">{{ '결과 보기' if is_last else '다음 문제 →' }}</button>
+  </form>
+</div>

@@ -1,43 +1,15 @@
 {% import "partials/_macros.html" as m %}
-{# 퀴즈·카드: 문제를 카드로 보여 준다. 정답은 서버에만 있고, 여기에는 문제와 보기만 보낸다 #}
-<div class="quiz-box" id="quiz-{{ quiz.quiz_id }}">
-  <form class="stack" hx-post="/ui/quiz/{{ quiz.quiz_id }}/submit" hx-target="#quiz-{{ quiz.quiz_id }}" hx-swap="outerHTML"
-        hx-indicator="#quiz-submit-loading-{{ quiz.quiz_id }}" hx-disabled-elt="find button[type=submit]">
-    <div class="tags">
-      <strong>{{ quiz.document_title }}</strong>
-      {% for k in quiz.keywords %}<span class="badge secondary">#{{ k }}</span>{% endfor %}
-    </div>
-    <input type="hidden" name="question_count" value="{{ quiz.questions | length }}">
-    <input type="hidden" name="started_at" value="{{ started_at }}">
-
-    <div class="quiz-cards">
-      {% for q in quiz.questions %}
-      <fieldset class="quiz-card">
-        <legend class="quiz-card-head">
-          <span class="badge outline">카드 {{ q.index + 1 }}</span>
-          <span class="badge secondary">{{ m.type_labels[q.type] }}</span>
-        </legend>
-        <p class="q-text pre">{{ q.question }}</p>
-        {% if q.type == "code_blank" %}
-          {% if q.code %}<pre class="code"><code>{{ q.code }}</code></pre>{% endif %}
-          <input class="input mono" name="answer_{{ q.index }}" required maxlength="500"
-                 placeholder="____ 에 들어갈 답" aria-label="{{ q.index + 1 }}번 답안" autocomplete="off">
-        {% else %}
-          <div class="options{{ ' ox' if q.type == 'ox' }}">
-            {% for opt in q.options %}
-            <label class="option">
-              <input type="radio" name="answer_{{ q.index }}" value="{{ opt }}" required>
-              <span>{{ opt }}</span>
-            </label>
-            {% endfor %}
-          </div>
-        {% endif %}
-      </fieldset>
-      {% endfor %}
-    </div>
-
-    <button type="submit" class="btn primary">채점하고 카드 뒤집기</button>
-    <p id="quiz-submit-loading-{{ quiz.quiz_id }}" class="htmx-indicator muted small"><span class="spinner"></span> 채점하는 중…</p>
-  </form>
+{# 퀴즈·카드: 한 문제씩 슬라이드로 풀고, 문제마다 바로 채점한다. 정답은 서버에만 있다 #}
+<div class="quiz-wrap">
+  <div class="tags">
+    <strong>{{ quiz.document_title }}</strong>
+    {% for k in quiz.keywords %}<span class="badge secondary">#{{ k }}</span>{% endfor %}
+  </div>
+  {% set quiz_id = quiz.quiz_id %}
+  {% set index = 0 %}
+  {% set total = quiz.questions | length %}
+  {% set answers_json = "[]" %}
+  {% set q = quiz.questions[0] %}
+  {% include "partials/quiz_slide.html" %}
   {{ m.tool_calls(quiz.tool_calls) }}
 </div>

@@ -28,7 +28,9 @@ from backend.services import (
     file_store,
     insights_service,
     lms_link_service,
+    pdf_highlight,
     profile_service,
+    quiz_service,
     study_service,
     viewer_service,
 )
@@ -312,6 +314,109 @@ async def ui_chat(
     )
 
 
+# 📝 기말 예상 문제: 문항 수·요청을 정해 만들고, 답을 적으면 AI가 의미로 채점한다
+@router.get("/ui/exam/new", response_class=HTMLResponse)
+async def ui_exam_new(request: Request, _user: WebUser, document_id: Annotated[str, Query()] = "") -> HTMLResponse:
+    doc_id = _parse_uuid(document_id)
+    if doc_id is None:
+        raise BadRequestError("예상 문제를 만들 교안을 골라 주세요.")
+    return _render(request, "partials/exam_new.html", {"document_id": doc_id})
+
+
+@router.post("/ui/exam", response_class=HTMLResponse)
+async def ui_exam_create(
+    request: Request,
+    user: WebUser,
+    db: DbDep,
+    agent: WebAgentDep,
+    document_id: Annotated[str, Form()],
+    count: Annotated[int, Form(ge=1, le=10)] = 5,
+    ask: Annotated[str, Form(max_length=300)] = "",
+) -> HTMLResponse:
+    doc_id = _parse_uuid(document_id)
+    if doc_id is None:
+        raise BadRequestError("예상 문제를 만들 교안을 골라 주세요.")
+    # 정답은 요청 문장에 '정답'이라고 적었을 때만 채점 결과에 함께 보여 준다
+    show_answer = "정답" in ask
+    draft, model_name = await agent.generate_exam(doc_id, count)
+    quiz_id = await quiz_service.save_exam(
+        db, user_id=user.id, document_id=doc_id, questions=draft.questions, model_name=model_name
+    )
+    return _render(
+        request,
+        "partials/exam_form.html",
+        {"quiz_id": quiz_id, "questions": draft.questions, "show_answer": show_answer},
+    )
+
+
+@router.post("/ui/exam/{quiz_id}/grade", response_class=HTMLResponse)
+async def ui_exam_grade(
+    request: Request,
+    quiz_id: UUID,
+    user: WebUser,
+    db: DbDep,
+    agent: WebAgentDep,
+    show_answer: Annotated[str, Form()] = "0",
+) -> HTMLResponse:
+    form = await request.form()
+    _, questions = await quiz_service.load_quiz(db, quiz_id=quiz_id, user_id=user.id)
+    answers = [str(form.get(f"a_{i}", "")).strip()[:500] for i in range(len(questions))]
+    if any(not a for a in answers):
+        raise BadRequestError("모든 문제에 답을 적은 뒤 채점해 주세요.")
+    graded = await agent.grade_exam([(q.question, q.answer, q.explanation) for q in questions], answers)
+    by_index = {r.index: r for r in graded.results}
+    rows = []
+    for i, q in enumerate(questions):
+        item = by_index.get(i)
+        rows.append(
+            {
+                "index": i,
+                "question": q.question,
+                "your_answer": answers[i],
+                "correct": bool(item and item.correct),
+                "feedback": item.feedback if item else "채점 결과를 받지 못했어요.",
+                "expected": q.answer,
+                "rubric": q.explanation,
+            }
+        )
+    return _render(
+        request,
+        "partials/exam_result.html",
+        {
+            "quiz_id": quiz_id,
+            "rows": rows,
+            "score": sum(1 for r in rows if r["correct"]),
+            "total": len(rows),
+            "show_answer": show_answer == "1",
+        },
+    )
+
+
+# 답변 밑 '그림으로 정리' 단추: 결과를 채팅이 아니라 오른쪽 '교안 보기' 칸에 크게 띄운다
+@router.post("/ui/diagram", response_class=HTMLResponse)
+async def ui_diagram(
+    request: Request,
+    _user: WebUser,
+    agent: WebAgentDep,
+    document_id: Annotated[str, Form()],
+) -> HTMLResponse:
+    doc_id = _parse_uuid(document_id)
+    try:
+        chat_request = ChatRequest(
+            message="이 교안의 핵심 개념을 마인드맵 그림으로 정리해줘",
+            document_id=doc_id,
+            route="study",
+        )
+    except ValidationError:
+        raise BadRequestError("그림으로 정리할 교안을 골라 주세요.") from None
+
+    try:
+        result = await agent.chat(chat_request)
+    except AppError as exc:
+        return _render(request, "partials/chat_error.html", {"message": exc.message, "draft": ""})
+    return _render(request, "partials/diagram_view.html", {"result": result, "document_id": doc_id})
+
+
 # 답변 밑 '이어서 하기' 단추: 교안을 코드가 바로 읽고 AI는 한 번만 불러서 빠르다
 @router.post("/ui/chat/summary", response_class=HTMLResponse)
 async def ui_chat_summary(
@@ -341,6 +446,110 @@ async def ui_chat_quiz(
     elapsed = round((time.perf_counter() - started) * 1000)
     return _render(
         request, "partials/chat_quiz.html", {"quiz": quiz, "started_at": int(time.time()), "answer_ms": elapsed}
+    )
+
+
+MAX_QUIZ_QUESTIONS = 10
+
+
+def _parse_answers(raw: str) -> list[str]:
+    """화면이 들고 다니는 지금까지의 답안 목록(JSON)을 검사한다."""
+    try:
+        data = json.loads(raw or "[]")
+    except json.JSONDecodeError:
+        raise BadRequestError("답안 정보를 다시 불러와 주세요.") from None
+    if not isinstance(data, list) or len(data) > MAX_QUIZ_QUESTIONS or not all(isinstance(a, str) for a in data):
+        raise BadRequestError("답안 정보를 다시 불러와 주세요.")
+    return [a.strip()[:500] for a in data]
+
+
+def _quiz_step_context(quiz_id: UUID, index: int, total: int, answers: list[str], started_at: str) -> dict[str, Any]:
+    return {
+        "quiz_id": quiz_id,
+        "index": index,
+        "total": total,
+        "answers_json": json.dumps(answers, ensure_ascii=False),
+        "started_at": _safe_int(started_at),
+    }
+
+
+@router.post("/ui/quiz/{quiz_id}/slide", response_class=HTMLResponse)
+async def ui_quiz_slide(
+    request: Request,
+    quiz_id: UUID,
+    user: WebUser,
+    db: DbDep,
+    index: Annotated[int, Form(ge=0, le=MAX_QUIZ_QUESTIONS - 1)],
+    answers_json: Annotated[str, Form()] = "[]",
+    started_at: Annotated[str, Form()] = "0",
+) -> HTMLResponse:
+    """슬라이드 한 장(문제 한 개)을 보여 준다. 앞 문제를 모두 채점했을 때만 다음 문제를 연다."""
+    _, questions = await quiz_service.load_quiz(db, quiz_id=quiz_id, user_id=user.id)
+    answers = _parse_answers(answers_json)
+    if index >= len(questions) or len(answers) != index:
+        raise BadRequestError("이전 문제부터 차례로 풀어 주세요.")
+    return _render(
+        request,
+        "partials/quiz_slide.html",
+        {"q": questions[index], **_quiz_step_context(quiz_id, index, len(questions), answers, started_at)},
+    )
+
+
+@router.post("/ui/quiz/{quiz_id}/check", response_class=HTMLResponse)
+async def ui_quiz_check(
+    request: Request,
+    quiz_id: UUID,
+    user: WebUser,
+    db: DbDep,
+    index: Annotated[int, Form(ge=0, le=MAX_QUIZ_QUESTIONS - 1)],
+    answer: Annotated[str, Form(max_length=500)],
+    answers_json: Annotated[str, Form()] = "[]",
+    started_at: Annotated[str, Form()] = "0",
+) -> HTMLResponse:
+    """이 문제 하나만 바로 채점해서 정답과 해설을 보여 준다. 결과는 아직 저장하지 않는다."""
+    _, questions = await quiz_service.load_quiz(db, quiz_id=quiz_id, user_id=user.id)
+    answers = _parse_answers(answers_json)
+    if index >= len(questions) or len(answers) != index:
+        raise BadRequestError("이전 문제부터 차례로 풀어 주세요.")
+    value = answer.strip()
+    if not value:
+        raise BadRequestError("답을 입력한 뒤 확인해 주세요.")
+    question = questions[index]
+    answers.append(value)
+    total = len(questions)
+    return _render(
+        request,
+        "partials/quiz_checked.html",
+        {
+            "q": question,
+            "correct": quiz_service.is_correct(question, value),
+            "your_answer": value,
+            "is_last": index + 1 >= total,
+            **_quiz_step_context(quiz_id, index, total, answers, started_at),
+        },
+    )
+
+
+@router.post("/ui/quiz/{quiz_id}/finish", response_class=HTMLResponse)
+async def ui_quiz_finish(
+    request: Request,
+    quiz_id: UUID,
+    user: WebUser,
+    db: DbDep,
+    answers_json: Annotated[str, Form()] = "[]",
+    started_at: Annotated[str, Form()] = "0",
+) -> HTMLResponse:
+    """모든 문제를 채점해 학습 기록을 남기고, 카드 결과(한 장씩)를 보여 준다."""
+    answers = _parse_answers(answers_json)
+    started = _safe_int(started_at)
+    duration = max(0, min(int(time.time()) - started, 86_400)) if started else None
+    result, questions = await study_service.submit_quiz(db, user.id, quiz_id, answers, duration)
+    dashboard = await study_service.get_dashboard(db, user.id)
+    return _render(
+        request,
+        "partials/quiz_result.html",
+        {"result": result, "questions": questions, "dashboard": dashboard, "oob": True,
+         **await _insights_context(db, user.id, dashboard)},
     )
 
 
@@ -493,6 +702,26 @@ async def ui_viewer(
 ) -> HTMLResponse:
     doc = await viewer_service.load(db, document_id, chunk, page)
     return _render(request, "partials/viewer.html", {"doc": doc})
+
+
+@router.get("/ui/viewer/{document_id}/page")
+async def ui_viewer_page(
+    document_id: UUID,
+    _user: WebUser,
+    db: DbDep,
+    page: Annotated[int, Query(ge=1, le=5000)],
+    q: Annotated[str, Query(max_length=400)] = "",
+) -> Response:
+    """PDF 원본의 한 쪽을 그림으로 그리고, 답변에 쓴 문장 부분을 노란 상자로 표시한다."""
+    data = await file_store.load_pdf(db, document_id)
+    if data is None:
+        raise NotFoundError("이 교안은 PDF 원본이 보관되어 있지 않아요.")
+    png, boxes = pdf_highlight.render_page(data, page, q)
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={"Cache-Control": "private, max-age=300", "X-Highlight-Count": str(boxes)},
+    )
 
 
 @router.get("/ui/viewer/{document_id}/file")

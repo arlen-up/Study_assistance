@@ -1,0 +1,24 @@
+{# 📝 예상 문제 채점 결과: 의미 기준으로 채점하고, 요청에 '정답'이 있었을 때만 정답을 보여 준다 #}
+<div class="bubble-row bot" id="exam-{{ quiz_id }}">
+  <article class="bubble bot wide" aria-label="예상 문제 채점 결과">
+    <div class="alert info score">
+      <p class="score-line">{{ score }} / {{ total }} 정답</p>
+      <p class="xsmall">답이 표현은 달라도 뜻이 맞으면 정답으로 채점했어요.</p>
+    </div>
+    {% for r in rows %}
+    <div class="exam-row {{ 'is-right' if r.correct else 'is-wrong' }}">
+      <p><span class="badge {{ 'success' if r.correct else 'danger' }}">{{ '⭕ 정답' if r.correct else '❌ 오답' }}</span> 문제 {{ r.index + 1 }}</p>
+      <p class="q-text pre">{{ r.question }}</p>
+      <p class="xsmall muted">내 답</p>
+      <p class="pre">{{ r.your_answer }}</p>
+      <p class="xsmall">{{ r.feedback }}</p>
+      {% if show_answer %}
+      <p class="xsmall muted">모범 답안</p>
+      <p class="pre">{{ r.expected }}</p>
+      <p class="xsmall muted">채점 기준</p>
+      <p class="pre">{{ r.rubric }}</p>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </article>
+</div>

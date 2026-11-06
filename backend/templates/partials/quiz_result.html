@@ -1,5 +1,5 @@
 {% import "partials/_macros.html" as m %}
-{# 퀴즈·카드 채점 결과: 카드를 눌러 뒤집으면 정답·해설이 보인다 (체크박스 + CSS, JS 없음) #}
+{# 퀴즈·카드 결과: 카드를 한 장씩 넘겨 본다. 카드를 누르면 뒤집혀 정답·해설이 보인다 (체크박스·라디오 + CSS, JS 없음) #}
 <div class="quiz-box" id="quiz-{{ result.quiz_id }}">
   <div class="alert info score">
     <p class="score-line">{{ result.score }} / {{ result.total }} 정답 {% if result.score == result.total %}🎉{% endif %}</p>
@@ -8,26 +8,34 @@
     {% elif result.review %}이 교안은 복습을 모두 마쳤어요!{% endif %}</p>
   </div>
 
-  <p class="muted xsmall">카드를 누르면 뒤집혀서 정답과 해설이 보여요.</p>
-  <div class="flash-grid">
+  <p class="muted xsmall">카드를 누르면 뒤집혀서 정답과 해설이 보여요. 이전·다음으로 넘겨 보세요.</p>
+  <div class="slides">
     {% for r in result.results %}
     {% set q = questions[r.index] %}
-    <div class="flashcard {{ 'is-right' if r.correct else 'is-wrong' }}">
-      <input type="checkbox" id="flip-{{ result.quiz_id }}-{{ r.index }}" class="flip-toggle"{% if not r.correct %} checked{% endif %}>
-      <label for="flip-{{ result.quiz_id }}-{{ r.index }}" class="flash-inner" aria-label="{{ r.index + 1 }}번 카드 뒤집기">
-        <span class="flash-face front">
-          <span class="flash-no">카드 {{ r.index + 1 }} · {{ m.type_labels[q.type] }}</span>
-          <span class="flash-mark">{{ "⭕ 정답" if r.correct else "❌ 오답" }}</span>
-          <span class="flash-text">{{ q.question }}</span>
-          <span class="flash-tip">눌러서 정답·해설 보기</span>
-        </span>
-        <span class="flash-face back">
-          <span class="flash-no">정답</span>
-          <span class="flash-answer mono">{{ r.correct_answer }}</span>
-          {% if not r.correct %}<span class="flash-hint">내 답: {{ r.your_answer }}</span>{% endif %}
-          <span class="flash-explain">{{ r.explanation }}</span>
-        </span>
-      </label>
+    <input type="radio" name="slide-{{ result.quiz_id }}" id="slide-{{ result.quiz_id }}-{{ r.index }}" class="slide-radio"{% if loop.first %} checked{% endif %}>
+    <div class="slide-card">
+      <div class="flashcard {{ 'is-right' if r.correct else 'is-wrong' }}">
+        <input type="checkbox" id="flip-{{ result.quiz_id }}-{{ r.index }}" class="flip-toggle"{% if not r.correct %} checked{% endif %}>
+        <label for="flip-{{ result.quiz_id }}-{{ r.index }}" class="flash-inner" aria-label="{{ r.index + 1 }}번 카드 뒤집기">
+          <span class="flash-face front">
+            <span class="flash-no">카드 {{ r.index + 1 }} · {{ m.type_labels[q.type] }}</span>
+            <span class="flash-mark">{{ "⭕ 정답" if r.correct else "❌ 오답" }}</span>
+            <span class="flash-text">{{ q.question }}</span>
+            <span class="flash-tip">눌러서 정답·해설 보기</span>
+          </span>
+          <span class="flash-face back">
+            <span class="flash-no">정답</span>
+            <span class="flash-answer mono">{{ r.correct_answer }}</span>
+            {% if not r.correct %}<span class="flash-hint">내 답: {{ r.your_answer }}</span>{% endif %}
+            <span class="flash-explain">{{ r.explanation }}</span>
+          </span>
+        </label>
+      </div>
+      <div class="slide-nav">
+        {% if not loop.first %}<label for="slide-{{ result.quiz_id }}-{{ r.index - 1 }}" class="btn outline sm">← 이전</label>{% endif %}
+        <span class="muted xsmall">{{ loop.index }} / {{ result.results | length }}</span>
+        {% if not loop.last %}<label for="slide-{{ result.quiz_id }}-{{ r.index + 1 }}" class="btn outline sm">다음 →</label>{% endif %}
+      </div>
     </div>
     {% endfor %}
   </div>

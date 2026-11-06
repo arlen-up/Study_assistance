@@ -29,3 +29,4 @@ markdown-it-py==4.2.0      # AI 답변 마크다운 → 안전한 HTML (HTML 태
 
 # --- Web Push 알림 ---
 pywebpush==2.5.0           # VAPID 서명 + 푸시 메시지 암호화 (py-vapid, http-ece 포함)
+pymupdf==1.28.2            # PDF 쪽을 그림으로 그리고 근거 문장에 노란 상자 표시

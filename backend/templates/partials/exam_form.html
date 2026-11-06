@@ -1,0 +1,23 @@
+{# 📝 예상 문제: 문제 문장 칸과 답 칸을 나눠 두고, 다 적으면 한 번에 채점한다 #}
+<div class="bubble-row bot" id="exam-{{ quiz_id }}">
+  <article class="bubble bot wide" aria-label="기말 예상 문제">
+    <p class="xsmall muted">📝 기말 예상 문제 {{ questions | length }}개 · 답을 적고 채점하세요</p>
+    <form class="stack exam-form" hx-post="/ui/exam/{{ quiz_id }}/grade" hx-target="#exam-{{ quiz_id }}" hx-swap="outerHTML"
+          hx-disabled-elt="find button[type=submit]" hx-indicator="#exam-grade-loading-{{ quiz_id }}">
+      {% for q in questions %}
+      <fieldset class="exam-item">
+        <legend class="badge outline">문제 {{ loop.index }}</legend>
+        <div class="exam-q"><p class="q-text pre">{{ q.question }}</p></div>
+        <label class="field">
+          <span class="xsmall muted">내 답</span>
+          <textarea class="textarea" name="a_{{ loop.index0 }}" rows="3" maxlength="500" required
+                    placeholder="답을 적어 보세요" aria-label="{{ loop.index }}번 내 답"></textarea>
+        </label>
+      </fieldset>
+      {% endfor %}
+      <input type="hidden" name="show_answer" value="{{ '1' if show_answer else '0' }}">
+      <button type="submit" class="btn primary">채점하기</button>
+      <p id="exam-grade-loading-{{ quiz_id }}" class="htmx-indicator muted small"><span class="spinner"></span> 답을 읽고 채점하는 중…</p>
+    </form>
+  </article>
+</div>
