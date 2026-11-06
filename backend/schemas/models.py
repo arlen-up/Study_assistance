@@ -162,6 +162,7 @@ class ChatResponse(BaseModel):
     context_document_id: UUID | None = None       # 다음 단추(요약·퀴즈·그림 정리)에 쓸 교안
     context_document_title: str | None = None
     answer_ms: int = 0                            # 답변 작성에 걸린 시간 (질문 분류 포함)
+    fallback_model: str | None = None             # 주 AI 모델 오류로 예비 모델이 답했으면 그 모델 이름
 
 
 # ---------------------------------------------------------------------
@@ -216,6 +217,9 @@ class QuizQuestionDraft(BaseModel):
     answer: str = Field(min_length=1, description="정답. multiple_choice는 보기 문자열 그대로, ox는 'O' 또는 'X'.")
     explanation: str = Field(min_length=5, description="정답 해설 (한국어, 2~3문장).")
     source_chunk_id: str | None = Field(default=None, description="문제 근거 chunk_id.")
+    retry_of_missed: bool = Field(
+        default=False, description="학생이 지난번에 틀린 개념을 다시 묻는 문항이면 true (틀린 문제 목록이 주어졌을 때만)."
+    )
 
     @model_validator(mode="after")
     def _validate_by_type(self) -> "QuizQuestionDraft":

@@ -7,6 +7,7 @@
       {{ m.route_badge(result.route) }}
       {% if result.route and result.route.type == "study" %}{{ m.evidence_badge(result.evidence) }}{% endif %}
       {% if result.answer_ms %}<span class="muted xsmall">{{ result.answer_ms | seconds }}</span>{% endif %}
+      {% if result.fallback_model %}<span class="badge warning" title="기본 AI 모델에 오류가 나서 예비 모델이 대신 답했어요">🔁 예비 모델 {{ result.fallback_model }}</span>{% endif %}
     </div>
 
     <div class="md">{{ result.answer | markdown(result.citations | selectattr("cited") | map(attribute="ref") | list, "cite-" ~ turn_id) }}</div>

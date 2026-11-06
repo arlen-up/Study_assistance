@@ -154,6 +154,7 @@ async def submit_quiz(
         score=score,
         total=len(questions),
         duration_seconds=duration_seconds,
+        missed=quiz_service.missed_items(questions, results),  # 다음 퀴즈에서 틀린 개념을 다시 묻는다
     )
     review = await review_service.get_review(db, user_id, document_id)
     response = QuizSubmitResponse(

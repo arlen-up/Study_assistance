@@ -38,7 +38,7 @@ from pydantic import BaseModel, ValidationError
 from supabase import AsyncClient
 
 from backend.core import semester
-from backend.core.config import Settings
+from backend.core.config import Settings, fallback_model_names
 from backend.core.errors import NotFoundError, UpstreamError
 from backend.integrations.lms_client import LmsClient
 from backend.mcp_server import COURSE_ALIASES, ToolDeps, bind_tool_deps, mcp
@@ -133,7 +133,8 @@ STUDY_PROMPT = """너는 IT 전공 대학생을 돕는 'LSSA'(Study Overflow) �
 
 [도구 사용]
 - 과목·주차가 나오면(예: '저번주 자바') find_course_materials(course, week_no)로 그 주차 교안을 찾는다.
-  그 주차 자료가 없으면 도구가 가까운 주차 자료와 note를 돌려준다 → note 내용을 답변 첫머리에 알려 준다.
+  그 주차 자료가 없으면 도구가 가까운 주차 자료와 note를 돌려준다 → 답변 첫 문장을 반드시
+  "요청한 N주차 자료는 없어요."로 시작하고(N은 물어본 주차), 그다음에 대신 보여 주는 주차를 알려 준다.
 - 개념 질문은 query_vector_db로 관련 교안 조각을 찾는다. 흐름 전체가 필요하면 fetch_lms_document로 본문을 읽는다.
 - 이미 위에 있는 도구 결과로 충분하면 다시 부르지 말고 바로 답한다. 부족할 때만 더 찾는다.
 
@@ -152,10 +153,13 @@ INFO_PROMPT = """너는 IT 전공 대학생을 돕는 'LSSA'(Study Overflow) 학
 - 성적표·수강 과목·이수 학점: lms_get_transcript / 졸업 요건: lms_get_graduation_requirements
 - 졸업까지 남은 학점·미이수 필수 과목·관심 직무 추천: career_analyze (이미 계산된 정확한 값 — 직접 다시 계산하지 않는다)
 - 과제와 마감: lms_list_assignments / 강의 자료 목록: lms_list_materials
+- 과제와 관련 개념을 함께 물으면: 과제 목록의 과제 설명으로 개념을 설명한다. 강의 자료 목록이 필요하면
+  lms_list_materials를 **과목 지정 없이 한 번만** 부른다 (과목을 바꿔 가며 여러 번 부르지 않는다).
 - 이미 위에 있는 도구 결과로 충분하면 다시 부르지 말고 바로 답한다.
 
 [답변]
 - 숫자는 도구 결과 그대로 쓴다. 추측하지 않는다. 학점·과목은 표로 정리하면 좋다.
+- 성적표·성적을 보여 달라고 하면 요약(이수 학점)만 하지 말고, 이수한 과목을 학기별로 과목·학점·성적(A+, B0 등) 표로 보여 준다.
 - 마감은 남은 시간(예: '내일 오후 8시, 약 20시간 남음')까지 알려 준다."""
 
 STRUCTURED_PROMPT = """너는 IT 전공 대학생을 돕는 'LSSA'(Study Overflow) 학습 도우미 AI다.
@@ -350,6 +354,34 @@ def info_prefetch(message: str) -> list[str]:
 
 # ---------------------------------------------------------------------
 # 에이전트
+
+RETRY_MARK = "🔁 지난번에 틀린 개념 —"
+
+# 주 모델에서 이 오류가 나면 예비 모델로 바꿔 다시 실행한다 (장애·시간 초과·요청 한도·모델 없음 등 OpenAI API 오류)
+FALLBACK_ERRORS: tuple[type[BaseException], ...] = (openai.APIError,)
+
+
+def with_model_fallback(
+    primary: Any,
+    fallbacks: Sequence[Any],
+    build: Callable[[Any], Runnable[Any, Any]],
+    *,
+    on_fallback: Callable[[str], None] | None = None,
+) -> Runnable[Any, Any]:
+    """build(주 모델)에 build(예비 모델)들을 차례로 붙인다. 예비 모델이 실행되면 on_fallback(모델 이름)을 부른다."""
+    first = build(primary)
+    if not fallbacks:
+        return first
+    backups: list[Runnable[Any, Any]] = []
+    for model in fallbacks:
+        name = str(getattr(model, "model_name", None) or getattr(model, "model", "") or type(model).__name__)
+        runnable = build(model)
+        if on_fallback is not None:
+            runnable = runnable.with_listeners(on_start=lambda _run, n=name: on_fallback(n))
+        backups.append(runnable)
+    return first.with_fallbacks(backups, exceptions_to_handle=FALLBACK_ERRORS)
+
+
 # ---------------------------------------------------------------------
 class AgentService:
     def __init__(
@@ -370,15 +402,36 @@ class AgentService:
         self._user_id = user_id
         # temperature / reasoning_effort는 None이면 요청에 넣지 않는다.
         # (gpt-6-luna 같은 추론 모델은 Chat Completions에서 함수 호출 시 reasoning_effort="none"이 필요)
-        self._llm = ChatOpenAI(
-            model=settings.llm_chat_model,
-            api_key=settings.llm_api_key,
-            base_url=settings.llm_base_url,
-            temperature=settings.llm_temperature,
-            reasoning_effort=settings.llm_reasoning_effort,
-            timeout=settings.llm_timeout_seconds,
-            max_retries=2,
+        fallbacks = fallback_model_names(settings)
+        self._llm = self._chat_model(settings.llm_chat_model, max_retries=1 if fallbacks else 2)
+        # 주 모델이 오류를 내면 차례로 바꿔 실행할 예비 모델 (LLM_FALLBACK_MODELS)
+        self._fallback_llms = [self._chat_model(name, max_retries=1) for name in fallbacks]
+        self.fallback_used: str | None = None  # 이번 요청에서 예비 모델이 답했으면 그 이름
+        # 이번 요청 안에서 부른 도구 결과 (같은 도구·같은 입력을 다시 부르면 저장한 결과를 돌려준다)
+        self._tool_cache: dict[str, str] = {}
+
+    def _chat_model(self, model: str, *, max_retries: int) -> ChatOpenAI:
+        s = self._settings
+        return ChatOpenAI(
+            model=model,
+            api_key=s.llm_api_key,
+            base_url=s.llm_base_url,
+            temperature=s.llm_temperature,
+            reasoning_effort=s.llm_reasoning_effort,
+            timeout=s.llm_timeout_seconds,
+            max_retries=max_retries,
         )
+
+    def _llm_with(self, build: Callable[[ChatOpenAI], Runnable[Any, Any]] | None = None) -> Runnable[Any, Any]:
+        """주 모델로 만든 실행기에, 오류가 나면 예비 모델로 같은 일을 다시 하는 대체 실행기를 붙인다."""
+        return with_model_fallback(
+            self._llm, self._fallback_llms, build or (lambda m: m), on_fallback=self._note_fallback
+        )
+
+    def _note_fallback(self, model: str) -> None:
+        if self.fallback_used is None:
+            logger.warning("주 AI 모델(%s) 오류 → 예비 모델(%s)로 다시 실행", self._settings.llm_chat_model, model)
+        self.fallback_used = model
 
     @property
     def model_name(self) -> str:
@@ -431,21 +484,30 @@ class AgentService:
                 tools = await load_mcp_tools(session, handle_tool_errors=True)
                 yield {tool.name: tool for tool in tools}
 
-    @staticmethod
     async def _call_tool(
-        tools: ToolMap, call: dict[str, Any], traces: list[ToolCallTrace], allowed: Iterable[str] | None = None
+        self, tools: ToolMap, call: dict[str, Any], traces: list[ToolCallTrace], allowed: Iterable[str] | None = None
     ) -> ToolMessage:
-        """MCP 도구 하나를 부르고 입력·출력·걸린 시간을 기록한다 (화면의 🔧 도구 기록)."""
+        """MCP 도구 하나를 부르고 입력·출력·걸린 시간을 기록한다 (화면의 🔧 도구 기록).
+
+        같은 요청 안에서 같은 도구를 같은 입력으로 다시 부르면 저장한 결과를 돌려주고, 다시 부르지 말라고 알린다.
+        (AI 평가에서 한 질문에 같은 도구를 8번 부르며 37초가 걸린 문제를 막기 위해)
+        """
         name, args = str(call["name"]), dict(call.get("args") or {})
         started = time.perf_counter()
         tool = tools.get(name)
+        key = f"{name}:{json.dumps(args, ensure_ascii=False, sort_keys=True, default=str)}"
         if tool is None or (allowed is not None and name not in allowed):
             message = ToolMessage(content=f"지금 쓸 수 없는 도구입니다: {name}", tool_call_id=call["id"], status="error")
+        elif key in self._tool_cache:
+            note = "(같은 도구를 같은 입력으로 이미 불렀어요. 결과는 아래와 같아요 — 다시 부르지 말고 이 결과로 답하세요.)\n"
+            message = ToolMessage(content=note + self._tool_cache[key], tool_call_id=call["id"])
         else:
             result = await tool.ainvoke(call)
             message = (
                 result if isinstance(result, ToolMessage) else ToolMessage(content=str(result), tool_call_id=call["id"])
             )
+            if message.status != "error":
+                self._tool_cache[key] = str(message.content)
         traces.append(
             ToolCallTrace(
                 name=name,
@@ -477,7 +539,7 @@ class AgentService:
     ) -> str:
         """AI가 도구를 스스로 골라 부르다가, 다 모았으면 학생에게 보여 줄 답변을 쓴다."""
         subset = [tool for name, tool in tools.items() if name in allowed]
-        llm = self._llm.bind_tools(subset)
+        llm = self._llm_with(lambda m: m.bind_tools(subset))
         for _ in range(self._settings.agent_max_iterations):
             ai = await self._invoke(llm, messages)
             # 일부 OpenAI 호환 서버는 tool_call id를 비워 보낸다 → 짝이 맞도록 채워 준다
@@ -492,7 +554,7 @@ class AgentService:
 
         logger.info("에이전트 최대 반복 횟수 도달 → 도구 없이 마무리")
         messages.append(HumanMessage(content="도구는 그만 부르고, 지금까지 모은 자료로 학생에게 보여 줄 답변을 써."))
-        final = await self._invoke(self._llm.bind_tools(subset, tool_choice="none"), messages)
+        final = await self._invoke(self._llm_with(lambda m: m.bind_tools(subset, tool_choice="none")), messages)
         return _text_of(final)
 
     # -----------------------------------------------------------------
@@ -523,7 +585,7 @@ class AgentService:
             HumanMessage(content=f"[앞 대화]\n{context or '(없음)'}\n\n[분류할 메시지]\n{request.message}"),
         ]
         try:
-            runnable = self._llm.with_structured_output(RouteDecision, method="function_calling")
+            runnable = self._llm_with(lambda m: m.with_structured_output(RouteDecision, method="function_calling"))
             result = await asyncio.wait_for(runnable.ainvoke(messages), ROUTER_TIMEOUT_SECONDS)
             decision = result if isinstance(result, RouteDecision) else RouteDecision.model_validate(result)
         except (TimeoutError, openai.OpenAIError, ValidationError, OutputParserException, ValueError) as exc:
@@ -545,7 +607,7 @@ class AgentService:
     # -----------------------------------------------------------------
     async def _answer_chat(self, request: ChatRequest) -> str:
         messages = [self._system(CHAT_PROMPT, SAFETY_RULES), *self._history(request), HumanMessage(request.message)]
-        return _text_of(await self._invoke(self._llm, messages))
+        return _text_of(await self._invoke(self._llm_with(), messages))
 
     async def _answer_study(
         self, request: ChatRequest, route: RouteInfo, deps: ToolDeps, traces: list[ToolCallTrace]
@@ -704,6 +766,7 @@ class AgentService:
             context_document_id=context_id,
             context_document_title=context_title,
             answer_ms=round((time.perf_counter() - started) * 1000),
+            fallback_model=self.fallback_used,
         )
 
     # -----------------------------------------------------------------
@@ -758,7 +821,7 @@ class AgentService:
         ]
 
         try:
-            runnable = self._llm.with_structured_output(schema, method="function_calling")
+            runnable = self._llm_with(lambda m: m.with_structured_output(schema, method="function_calling"))
             result = await runnable.ainvoke(messages)
             return result if isinstance(result, schema) else schema.model_validate(result)
         except (ValidationError, OutputParserException, openai.BadRequestError) as first_error:
@@ -774,7 +837,7 @@ class AgentService:
             )
         )
         try:
-            raw = await self._llm.ainvoke(messages)
+            raw = await self._llm_with().ainvoke(messages)
             return schema.model_validate(_extract_json(_text_of(raw)))
         except openai.OpenAIError as exc:
             logger.warning("LLM 호출 실패: %s", type(exc).__name__)
@@ -916,6 +979,15 @@ class AgentService:
         title, deps, traces = await self._load_document(document_id, "핵심 키워드")
 
         level = {"easy": "개념 확인 수준", "medium": "개념 적용 수준", "hard": "응용·코드 분석 수준"}[difficulty]
+        missed = await self._recent_missed(document_id)
+        retry = ""
+        if missed:
+            listed = "\n".join(f"  · {m['question']} (정답: {m['answer']})" for m in missed)
+            retry = (
+                "\n[지난번에 이 학생이 틀린 문제]\n" + listed + "\n"
+                "- 위 개념 중 하나 이상을 **다른 표현·다른 유형**으로 다시 묻는 문항을 최소 1개 넣어 (같은 문장 그대로 X).\n"
+                "- 그렇게 다시 묻는 문항은 retry_of_missed=true 로 표시해."
+            )
         draft = await self._structured(
             QuizDraft,
             task=(
@@ -924,7 +996,7 @@ class AgentService:
                 "- 코드가 없는 교안이면 code_blank 대신 핵심 용어를 빈칸으로 둔 짧은 문장이나 의사 코드를 써\n"
                 "- multiple_choice: 보기 4개, answer는 보기 문자열과 완전히 동일\n"
                 "- ox: answer는 'O' 또는 'X'\n"
-                "- 각 문항에 해설과 근거 source_chunk_id를 넣어."
+                "- 각 문항에 해설과 근거 source_chunk_id를 넣어." + retry
             ),
             deps=deps,
         )
@@ -933,8 +1005,41 @@ class AgentService:
         for question in draft.questions:
             if question.source_chunk_id and question.source_chunk_id not in deps.retrieved:
                 question.source_chunk_id = None
+            # 지난번에 틀린 개념을 다시 묻는 문항은 해설 앞에 표시 (표시는 AI가 아니라 코드가 붙인다)
+            if missed and question.retry_of_missed and not question.explanation.startswith(RETRY_MARK):
+                question.explanation = f"{RETRY_MARK} {question.explanation}"
+            elif not missed:
+                question.retry_of_missed = False
 
         return document_id, title, draft, traces
+
+    async def _recent_missed(self, document_id: UUID, limit: int = 3) -> list[dict[str, str]]:
+        """이 학생이 이 교안 퀴즈에서 최근에 틀린 문제 (적응형 학습). 기록이 없거나 조회가 실패하면 빈 목록."""
+        if self._user_id is None:
+            return []
+        try:
+            res = (
+                await self._db.table("study_logs")
+                .select("missed")
+                .eq("user_id", str(self._user_id))
+                .eq("document_id", str(document_id))
+                .not_.is_("missed", "null")
+                .order("studied_at", desc=True)
+                .limit(5)
+                .execute()
+            )
+        except Exception:
+            logger.info("틀린 문제 조회 실패 (마이그레이션 전?) — 일반 퀴즈로 만듦")
+            return []
+        seen: set[str] = set()
+        out: list[dict[str, str]] = []
+        for row in res.data or []:
+            for item in row.get("missed") or []:
+                question = str(item.get("question", ""))
+                if question and question not in seen:
+                    seen.add(question)
+                    out.append({"question": question[:200], "answer": str(item.get("answer", ""))[:100]})
+        return out[:limit]
 
     # -----------------------------------------------------------------
     # 커리어 조언 (career_service.CareerAdvisor 구현)

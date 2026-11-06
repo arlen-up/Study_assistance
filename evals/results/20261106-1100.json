@@ -1,0 +1,47 @@
+{
+  "meta": {
+    "started": "2026-11-06 11:00 KST",
+    "model": "gpt-6-luna",
+    "embedding": "text-embedding-3-small",
+    "accounts": 1
+  },
+  "results": [
+    {
+      "id": "hard-mix-02",
+      "category": "info",
+      "tags": [
+        "혼합"
+      ],
+      "question": "자바 과제 마감 언제야? 그 과제랑 관련된 개념도 같이 알려줘",
+      "accept_routes": [
+        "info",
+        "study"
+      ],
+      "expect_any": [
+        "상속"
+      ],
+      "skip": [
+        "학교 시스템 출처"
+      ],
+      "route": "info",
+      "route_method": "llm",
+      "evidence": null,
+      "cited_titles": [],
+      "tools": [
+        "lms_list_assignments",
+        "lms_list_materials"
+      ],
+      "lms_sources": [
+        "과제 목록",
+        "강의 자료 목록"
+      ],
+      "answer": "### 자바 과제 마감\n\n**「상속과 인터페이스 실습」** 과제는 **11월 7일(토) 오전 9시(KST)**까지예요. 현재 시각 기준으로 **약 22시간 남았습니다.**\n\n과제는 `Shape` 인터페이스와 `Circle`, `Rectangle` 클래스를 구현하는 내용입니다.\n\n### 관련 개념\n\n- **인터페이스**: 클래스가 제공해야 할 메서드의 규칙을 정합니다. 과제에서는 `Shape`가 도형의 동작을 선언하고, 두 도형 클래스가 그 규칙을 구현하면 됩니다.\n- **구현(implements)**: 클래스가 인터페이스에 선언된 메서드를 실제 코드로 작성하는 것입니다.\n- **상속(extends)**: 기존 클래스의 속성이나 기능을 물려받는 기능입니다. 이번 과제 설명만으로는 어떤 클래스를 상속할지 지정되어 있지 않으니, `Shape` 인터페이스 구현과 구분해서 보면 좋아요.\n\n강의 자료 목록에는 **「추상클래스와 인터페이스」** 자료가 있어, 인터페이스 개념을 복습하기에 알맞습니",
+      "checks": {
+        "분류": true,
+        "사실 정확": true
+      },
+      "passed": true,
+      "ms": 24005
+    }
+  ]
+}

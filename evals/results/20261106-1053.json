@@ -1,0 +1,67 @@
+{
+  "meta": {
+    "started": "2026-11-06 10:53 KST",
+    "model": "gpt-6-luna",
+    "embedding": "text-embedding-3-small",
+    "accounts": 1
+  },
+  "results": [
+    {
+      "id": "hard-trap-01",
+      "category": "study_out",
+      "tags": [
+        "함정"
+      ],
+      "question": "자바 스트림 API 사용법 알려줘",
+      "route": "study",
+      "route_method": "llm",
+      "evidence": "low",
+      "cited_titles": [],
+      "tools": [
+        "find_course_materials",
+        "query_vector_db"
+      ],
+      "lms_sources": [],
+      "answer": "교안에서는 스트림 API 사용법을 찾지 못했어요. 아래는 자바에서 일반적으로 쓰는 스트림 API 설명입니다.\n\n### 스트림 API란?\n스트림은 컬렉션 같은 데이터를 **차례로 처리하는 도구**입니다. 원본 컬렉션을 직접 바꾸기보다, `filter`, `map` 같은 연산을 연결해 원하는 결과를 만듭니다.\n\n### 기본 사용법\n\n```java\nimport java.util.List;\nimport java.util.stream.Collectors;\n\npublic class Main {\n    public static void main(String[] args) {\n        List<String> names = List.of(\"민수\", \"지영\", \"민호\");\n\n        List<String> result = names.stream()\n                .filter(name -> name.startsWith(\"민\")) // 조건에 맞는 요소만 남김\n         ",
+      "checks": {
+        "분류": true,
+        "근거 부족 표시": true
+      },
+      "passed": true,
+      "ms": 13066
+    },
+    {
+      "id": "hard-trap-02",
+      "category": "study",
+      "tags": [
+        "함정"
+      ],
+      "question": "정보통신개론 15주차 내용 알려줘",
+      "expect_any": [
+        "없",
+        "확인되지",
+        "아직 올라오지",
+        "찾을 수 없"
+      ],
+      "expect_evidence": "any",
+      "note": "15주차 자료는 없음 → 없다(확인되지 않는다)고 알려야 함. 2026-11-06 첫 실행 후 채점 기준을 넓힘 (모델 수정 아님, evals/개선_기록.md 참고)",
+      "route": "study",
+      "route_method": "llm",
+      "evidence": "medium",
+      "cited_titles": [
+        "[정보통신개론] 11주차 근거리통신망(LAN)"
+      ],
+      "tools": [
+        "find_course_materials"
+      ],
+      "lms_sources": [],
+      "answer": "15주차 교안은 없어요. 시험 주간이거나 아직 올라오지 않았을 수 있어, 가장 가까운 이전 수업인 **11주차 ‘근거리통신망(LAN)’** 내용을 대신 정리해 드릴게요.\n\n### 11주차: 근거리통신망(LAN)\n- **LAN**은 건물이나 캠퍼스처럼 가까운 범위의 장치들을 연결하는 네트워크입니다.\n- 대표적인 유선 LAN 기술은 **이더넷**, 무선 LAN 기술은 **Wi-Fi(IEEE 802.11)**입니다.\n- 네트워크 연결 형태에는 **버스형, 링형, 스타형, 메시형**이 있습니다.\n- 오늘날에는 **스위치를 중심으로 연결하는 스타형**을 주로 사용합니다. [1]",
+      "checks": {
+        "분류": true,
+        "사실 정확": true
+      },
+      "passed": true,
+      "ms": 5737
+    }
+  ]
+}

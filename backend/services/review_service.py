@@ -1,7 +1,9 @@
-"""에빙하우스 망각 곡선 복습 일정 (앱 내 알림).
+"""에빙하우스 망각 곡선 복습 일정 — 퀴즈 성적에 맞춰 바뀐다 (적응형).
 
-DB 뷰 `review_schedule`이 교안별 학습 횟수로 다음 복습 시점을 계산한다.
-  1회 완료 → +1일, 2회 → +3일, 3회 → +7일, 4회 이상 → 완료
+교안마다 최근 학습 기록을 보고 다음 복습 시점을 정한다.
+  - 잘 푼 학습(3문제 중 2개 이상, 점수 없는 학습 포함)이 연속으로 쌓이면 1일 → 3일 → 7일 → 복습 완료
+  - 마지막 퀴즈를 못 풀었으면(3문제 중 1개 이하) 연속 기록이 끊기고 **1일 뒤 다시** 복습
+DB 뷰 `review_schedule`은 교안별 학습 횟수·마지막 학습 시각을 주고, 간격 계산은 여기서 한다.
 대시보드를 열 때 is_due=True 인 항목을 '오늘 복습할 교안'으로 보여준다.
 """
 
@@ -18,6 +20,27 @@ from backend.schemas.models import ReviewItem, ReviewListResponse
 logger = logging.getLogger(__name__)
 
 _STAGE_LABELS = {1: "1일 후 복습", 2: "3일 후 복습", 3: "7일 후 복습"}
+_INTERVAL_DAYS = {1: 1, 2: 3, 3: 7}   # 잘 푼 학습 연속 횟수 → 다음 복습까지 날짜 (4번 이상이면 완료)
+GOOD_RATIO = 2 / 3                    # 이 비율 이상 맞히면 '잘 풂'
+
+
+def _good(score: int | None, total: int | None) -> bool:
+    return score is None or not total or score / total >= GOOD_RATIO - 1e-9
+
+
+def adaptive_next(sessions: list[tuple[dt.datetime, int | None, int | None]]) -> tuple[dt.datetime | None, str]:
+    """(학습 시각, 점수, 문항 수) 목록(최신 먼저) → (다음 복습 시각 또는 None=완료, 단계 이름)."""
+    last_at, score, total = sessions[0]
+    streak = 0
+    for _, s, t in sessions:
+        if not _good(s, t):
+            break
+        streak += 1
+    if streak == 0:
+        return last_at + dt.timedelta(days=1), f"다시 복습 (지난 퀴즈 {score}/{total})"
+    if streak > len(_INTERVAL_DAYS):
+        return None, "복습 완료"
+    return last_at + dt.timedelta(days=_INTERVAL_DAYS[streak]), _STAGE_LABELS[streak]
 _FAR_FUTURE = dt.datetime.max.replace(tzinfo=dt.UTC)
 
 
@@ -49,7 +72,42 @@ async def _fetch(db: AsyncClient, user_id: UUID, document_id: UUID | None = None
     except Exception:
         logger.exception("review_schedule 조회 실패")
         raise UpstreamError("복습 일정을 불러오지 못했습니다.") from None
-    return await _only_own_documents(db, user_id, [_to_item(row) for row in res.data or []])
+    items = await _only_own_documents(db, user_id, [_to_item(row) for row in res.data or []])
+    return await _apply_adaptive(db, user_id, items)
+
+
+async def _apply_adaptive(db: AsyncClient, user_id: UUID, items: list[ReviewItem]) -> list[ReviewItem]:
+    """최근 퀴즈 성적으로 다음 복습 시점·단계를 다시 정한다. 조회가 실패하면 횟수 기준 일정을 그대로 쓴다."""
+    ids = list({str(item.document_id) for item in items})
+    if not ids:
+        return items
+    try:
+        res = (
+            await db.table("study_logs")
+            .select("document_id,score,total_questions,studied_at")
+            .eq("user_id", str(user_id))
+            .eq("completed", True)
+            .in_("document_id", ids)
+            .order("studied_at", desc=True)
+            .limit(2000)
+            .execute()
+        )
+    except Exception:
+        logger.warning("복습 간격 조정용 학습 기록 조회 실패 — 횟수 기준 일정 사용", exc_info=True)
+        return items
+    sessions: dict[str, list[tuple[dt.datetime, int | None, int | None]]] = {}
+    for row in res.data or []:
+        sessions.setdefault(row["document_id"], []).append(
+            (dt.datetime.fromisoformat(row["studied_at"]), row.get("score"), row.get("total_questions"))
+        )
+    now = dt.datetime.now(dt.UTC)
+    for item in items:
+        history = sessions.get(str(item.document_id))
+        if not history:
+            continue
+        item.next_review_at, item.stage_label = adaptive_next(history)
+        item.is_due = item.next_review_at is not None and item.next_review_at <= now
+    return items
 
 
 async def _only_own_documents(db: AsyncClient, user_id: UUID, items: list[ReviewItem]) -> list[ReviewItem]:
