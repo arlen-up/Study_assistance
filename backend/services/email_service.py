@@ -24,7 +24,7 @@ from backend.services.notification_service import (
 )
 
 KST = dt.timezone(dt.timedelta(hours=9))
-SENDER_NAME = "Study Overflow"
+SENDER_NAME = "LMMS"
 MAX_ITEMS = 3
 
 

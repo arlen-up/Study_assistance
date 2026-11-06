@@ -1,11 +1,12 @@
 {% extends "base.html" %}
-{% block title %}로그인 · Study Overflow{% endblock %}
+{% block title %}로그인 · LMMS{% endblock %}
 {% block body %}
 <main class="center-page">
   <section class="card login-card">
     <div class="login-head">
       <img src="/static/img/logo.png" alt="" class="logo-img" width="72" height="72">
-      <h1>Study Overflow</h1>
+      <h1>LMMS</h1>
+      <p class="subname">Study Overflow</p>
       <p class="tagline">{{ app_tagline }}</p>
       <p class="muted">{% if mode == "signup" %}새 계정 만들기{% else %}로그인하고 오늘의 학습을 시작하세요{% endif %}</p>
     </div>
