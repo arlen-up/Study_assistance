@@ -307,6 +307,7 @@ mark.hl { background: var(--hl); color: inherit; border-radius: 3px; padding: 1p
 .delta.flat { color: var(--muted); }
 
 .chart-grid { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.chart-grid > .chart:last-child:nth-child(odd) { grid-column: 1 / -1; }
 .chart { margin: 0; display: grid; gap: 8px; align-content: start; }
 .chart-title { font-size: .95rem; font-weight: 800; }
 .chart-svg { width: 100%; height: auto; display: block; overflow: visible; }
