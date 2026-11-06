@@ -1,7 +1,7 @@
 """가상 코스모스 — 학교 계정 연결 (OAuth 2.0 Authorization Code + PKCE).
 
 흐름
-  1. 도우미(LMMS)가 학생을 GET /lms/oauth/authorize 로 보낸다 (client_id, redirect_uri, state, code_challenge, scope)
+  1. 도우미(LSSA)가 학생을 GET /lms/oauth/authorize 로 보낸다 (client_id, redirect_uri, state, code_challenge, scope)
   2. 학생이 '학교' 화면에서 학번·비밀번호로 로그인하고, 요청한 권한을 보고 허용한다
      → 학생의 학교 비밀번호는 도우미에게 전달되지 않는다
   3. 학교는 일회용 코드(5분, 한 번만)를 붙여 redirect_uri 로 돌려보낸다
@@ -47,7 +47,7 @@ from lms_mock.security import (
 logger = logging.getLogger("lms_mock.oauth")
 router = APIRouter(prefix="/oauth", tags=["학교 계정 연결 (OAuth 2.0)"])
 
-APP_NAME = "LMMS (Study Overflow)"
+APP_NAME = "LSSA (Study Overflow)"
 _CHALLENGE_LEN = (43, 128)
 
 

@@ -16,7 +16,7 @@ from lms_mock.config import LmsSettings
 from lms_mock.errors import LmsError
 
 # 등록된 앱(클라이언트). 실제 학교에서는 전산팀이 앱을 등록하고 client_id/secret 을 발급한다.
-CLIENT_ID = "lmms-study-overflow"
+CLIENT_ID = "lssa-study-overflow"
 CALLBACK_PATH = "/ui/lms/oauth/callback"
 
 # 권한 범위: 앱은 필요한 것만 요청하고, 학생은 동의 화면에서 내용을 보고 허용한다.

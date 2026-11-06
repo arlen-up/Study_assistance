@@ -141,7 +141,7 @@ async def connect_school_account(
     student_id = token.student_id
     if await _student_taken_by_other(db, student_id, user_id):
         await lms.revoke(token.access_token)
-        raise BadRequestError("이 학교 계정은 이미 다른 LMMS 계정에 연결돼 있어요.", code="lms_already_linked")
+        raise BadRequestError("이 학교 계정은 이미 다른 LSSA 계정에 연결돼 있어요.", code="lms_already_linked")
 
     previous = await _get_user_row(db, user_id)
     if previous.get("lms_token_enc"):

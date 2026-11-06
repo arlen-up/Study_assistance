@@ -513,7 +513,7 @@ def pet_stage(streak: int, active_days: int) -> str:
 # ---------------------------------------------------------------------
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--password", help="5개 계정 공통 비밀번호 — LMMS 로그인과 가상 학교 로그인 모두 (비우면 무작위)")
+    parser.add_argument("--password", help="5개 계정 공통 비밀번호 — LSSA 로그인과 가상 학교 로그인 모두 (비우면 무작위)")
     args = parser.parse_args()
     if args.password is not None and len(args.password) < 6:
         sys.exit("비밀번호는 6자 이상이어야 해요.")
@@ -588,7 +588,7 @@ def main() -> None:
 
     hint = "직접 정한 값" if args.password else "무작위 — 다시 실행하면 바뀌어요"
     print(f"\n✅ 완료! 5개 계정 공통 비밀번호 ({hint}): {password}")
-    print("   (LMMS 로그인 = 이메일 + 비밀번호, 가상 학교 로그인 = 학번 2026900001~5 + 같은 비밀번호)\n")
+    print("   (LSSA 로그인 = 이메일 + 비밀번호, 가상 학교 로그인 = 학번 2026900001~5 + 같은 비밀번호)\n")
     for p, completed, now_credits, codes, count, no_docs, todo, streak, stage in summary:
         print(f"- {p.email}  {p.name} · {p.grade_year}학년({p.admission_year} 입학) · 관심 직무 {p.target_job}")
         print(f"    이수 {completed}학점 / 졸업 {total_required}학점 (남은 {max(total_required - completed, 0)}학점)"

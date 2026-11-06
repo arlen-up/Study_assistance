@@ -65,7 +65,7 @@ def _error_response(request: Request, status: int, code: str, message: str) -> R
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="LMMS (Study Overflow)",
+        title="LSSA (Study Overflow)",
         version=__version__,
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
