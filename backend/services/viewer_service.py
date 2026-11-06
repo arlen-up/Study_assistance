@@ -39,6 +39,7 @@ class ViewerDoc:
     source_type: str
     page: int | None = None
     has_pdf: bool = False
+    highlight_text: str = ""  # PDF 쪽에서 강조할 근거 문장
     blocks: list[ViewerBlock] = field(default_factory=list)
     highlighted: bool = False
 
@@ -124,6 +125,7 @@ async def load(db: AsyncClient, document_id: UUID, chunk_id: UUID | None = None,
     if doc.source_type == "pdf":
         doc.has_pdf = await file_store.has_pdf(db, document_id)
         if doc.has_pdf:
+            doc.highlight_text = (chunk["content"] if chunk else "")[:400]
             return doc
         doc.blocks = await _pdf_pages(db, document_id, chunk)
     else:

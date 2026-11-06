@@ -502,3 +502,7 @@ mark.hl { background: var(--hl); color: inherit; border-radius: 3px; padding: 1p
 .exam-row { display: grid; gap: 6px; padding: 12px; margin-top: 8px; border: 1px solid var(--border); border-radius: var(--radius); }
 .exam-row.is-right { border-color: #86efac; }
 .exam-row.is-wrong { border-color: #fca5a5; }
+
+/* ---------- 📄 PDF 쪽 그림 (근거 강조) ---------- */
+.pdf-page-figure { margin: 0 0 8px; }
+.pdf-page { display: block; width: 100%; height: auto; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; }

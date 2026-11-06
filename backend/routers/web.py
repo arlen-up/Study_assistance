@@ -27,6 +27,7 @@ from backend.services import (
     file_store,
     insights_service,
     lms_link_service,
+    pdf_highlight,
     quiz_service,
     study_service,
     viewer_service,
@@ -658,6 +659,26 @@ async def ui_viewer(
 ) -> HTMLResponse:
     doc = await viewer_service.load(db, document_id, chunk, page)
     return _render(request, "partials/viewer.html", {"doc": doc})
+
+
+@router.get("/ui/viewer/{document_id}/page")
+async def ui_viewer_page(
+    document_id: UUID,
+    _user: WebUser,
+    db: DbDep,
+    page: Annotated[int, Query(ge=1, le=5000)],
+    q: Annotated[str, Query(max_length=400)] = "",
+) -> Response:
+    """PDF 원본의 한 쪽을 그림으로 그리고, 답변에 쓴 문장 부분을 노란 상자로 표시한다."""
+    data = await file_store.load_pdf(db, document_id)
+    if data is None:
+        raise NotFoundError("이 교안은 PDF 원본이 보관되어 있지 않아요.")
+    png, boxes = pdf_highlight.render_page(data, page, q)
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={"Cache-Control": "private, max-age=300", "X-Highlight-Count": str(boxes)},
+    )
 
 
 @router.get("/ui/viewer/{document_id}/file")
