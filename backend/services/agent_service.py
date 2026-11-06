@@ -808,13 +808,32 @@ class AgentService:
         ]
 
     async def _get_document_title(self, document_id: UUID) -> str:
-        res = await self._db.table("documents").select("title").eq("id", str(document_id)).limit(1).execute()
+        """본인 교안만 (교안은 계정별로 나뉜다). 남의 교안 ID면 '없음'."""
+        if self._user_id is None:
+            raise NotFoundError("교안을 찾을 수 없습니다.")
+        res = (
+            await self._db.table("documents")
+            .select("title")
+            .eq("id", str(document_id))
+            .eq("created_by", str(self._user_id))
+            .limit(1)
+            .execute()
+        )
         if not res.data:
             raise NotFoundError("교안을 찾을 수 없습니다.")
         return str(res.data[0]["title"])
 
     async def resolve_latest_document(self) -> tuple[UUID, str]:
-        res = await self._db.table("documents").select("id,title").order("created_at", desc=True).limit(1).execute()
+        if self._user_id is None:
+            raise NotFoundError("등록된 교안이 없습니다. 먼저 교안을 업로드해 주세요.")
+        res = (
+            await self._db.table("documents")
+            .select("id,title")
+            .eq("created_by", str(self._user_id))
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
         if not res.data:
             raise NotFoundError("등록된 교안이 없습니다. 먼저 교안을 업로드해 주세요.")
         return UUID(res.data[0]["id"]), str(res.data[0]["title"])

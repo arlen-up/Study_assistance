@@ -81,12 +81,16 @@ def _block(page: int | None, text: str, needle: str | None) -> ViewerBlock:
     )
 
 
-async def load(db: AsyncClient, document_id: UUID, chunk_id: UUID | None = None, page: int | None = None) -> ViewerDoc:
+async def load(
+    db: AsyncClient, user_id: UUID, document_id: UUID, chunk_id: UUID | None = None, page: int | None = None
+) -> ViewerDoc:
+    """본인 교안만 연다 (교안은 계정별로 나뉜다)."""
     try:
         res = (
             await db.table("documents")
             .select("id,title,course_name,week_no,source_type,raw_text")
             .eq("id", str(document_id))
+            .eq("created_by", str(user_id))
             .limit(1)
             .execute()
         )

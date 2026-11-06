@@ -17,7 +17,7 @@ from backend.core.config import Settings
 from backend.core.errors import AppError, BadRequestError, UpstreamError
 from backend.integrations.lms_client import LmsAssignment, LmsClient, LmsMaterialSummary, LmsSubmission, LmsTranscript
 from backend.schemas.models import AuthUser, DocumentIngestResponse, LmsLinkStatus
-from backend.services.document_service import ingest_document, parse_plain_text
+from backend.services.document_service import copy_document, ingest_document, parse_plain_text
 from backend.services.embedding_service import EmbeddingService
 
 logger = logging.getLogger(__name__)
@@ -163,10 +163,16 @@ async def list_materials(db: AsyncClient, lms: LmsClient, user_id: UUID) -> list
     return await lms.list_student_materials(await require_student_id(db, user_id))
 
 
-async def imported_material_ids(db: AsyncClient) -> set[str]:
-    """이미 RAG 인덱스로 가져온 LMS 자료 ID 집합."""
+async def imported_material_ids(db: AsyncClient, user_id: UUID) -> set[str]:
+    """이 사용자가 이미 RAG 인덱스로 가져온 LMS 자료 ID 집합 (교안은 계정별로 나뉜다)."""
     try:
-        res = await db.table("documents").select("source_url").like("source_url", f"{LMS_SOURCE_PREFIX}%").execute()
+        res = (
+            await db.table("documents")
+            .select("source_url")
+            .eq("created_by", str(user_id))
+            .like("source_url", f"{LMS_SOURCE_PREFIX}%")
+            .execute()
+        )
     except Exception:
         logger.exception("가져온 자료 조회 실패")
         return set()
@@ -176,19 +182,17 @@ async def imported_material_ids(db: AsyncClient) -> set[str]:
 async def import_material(
     db: AsyncClient, settings: Settings, lms: LmsClient, user_id: UUID, material_id: str
 ) -> DocumentIngestResponse:
-    """LMS 강의 자료를 가져와 도우미의 RAG 인덱스(documents/document_chunks)에 저장한다."""
+    """LMS 강의 자료를 가져와 이 사용자의 RAG 인덱스(documents/document_chunks)에 저장한다.
+
+    교안은 계정별로 나뉜다. 같은 자료를 다른 학생이 이미 가져왔고 내용이 지금 LMS 자료와 같으면,
+    AI 임베딩을 다시 만들지 않고 복사한다 (학교 강의 자료라 개인 정보가 아니다).
+    """
     student_id = await require_student_id(db, user_id)  # 연결된 학생만 가져오기 허용
     source_url = f"{LMS_SOURCE_PREFIX}{material_id}"
 
-    try:
-        existing = (
-            await db.table("documents").select("id,title,raw_text").eq("source_url", source_url).limit(1).execute()
-        )
-    except Exception:
-        logger.exception("documents 중복 확인 실패")
-        raise UpstreamError("교안 정보를 확인하지 못했습니다.") from None
-    if existing.data:
-        row = existing.data[0]
+    existing = await _own_material_document(db, user_id, source_url)
+    if existing:
+        row = existing
         count = (
             await db.table("document_chunks").select("id", count="exact").eq("document_id", row["id"]).execute()
         ).count or 0
@@ -200,19 +204,59 @@ async def import_material(
             already_imported=True,
         )
 
-    material = await lms.get_material(student_id, material_id)
+    material = await lms.get_material(student_id, material_id)  # 수강 중인 과목 자료만 받을 수 있다
+    parsed = parse_plain_text(material.content)
+    template = await _same_material_elsewhere(db, source_url, parsed.full_text)
+    if template is not None:
+        try:
+            return await copy_document(db, template, created_by=user_id)
+        except AppError:
+            logger.warning("교안 복사 실패 → 새로 임베딩해서 가져옴 (%s)", material_id)
     week = f"{material.week_no}주차 " if material.week_no else ""
     return await ingest_document(
         db,
         EmbeddingService(settings),
         title=f"[{material.course_name}] {week}{material.title}",
-        parsed=parse_plain_text(material.content),
+        parsed=parsed,
         created_by=user_id,
         course_name=material.course_name,
         week_no=material.week_no,
         keywords=[],
         source_url=source_url,
     )
+
+
+async def _own_material_document(db: AsyncClient, user_id: UUID, source_url: str) -> dict[str, Any] | None:
+    try:
+        res = (
+            await db.table("documents")
+            .select("id,title,raw_text")
+            .eq("created_by", str(user_id))
+            .eq("source_url", source_url)
+            .limit(1)
+            .execute()
+        )
+    except Exception:
+        logger.exception("documents 중복 확인 실패")
+        raise UpstreamError("교안 정보를 확인하지 못했습니다.") from None
+    return res.data[0] if res.data else None
+
+
+async def _same_material_elsewhere(db: AsyncClient, source_url: str, full_text: str) -> str | None:
+    """다른 계정이 이미 가져온 같은 LMS 자료 중 내용이 똑같은 것 (복사 원본). 없으면 None."""
+    try:
+        res = (
+            await db.table("documents")
+            .select("id,raw_text")
+            .eq("source_url", source_url)
+            .order("created_at", desc=True)
+            .limit(5)
+            .execute()
+        )
+    except Exception:
+        logger.warning("복사할 LMS 자료 찾기 실패 → 새로 임베딩", exc_info=True)
+        return None
+    return next((row["id"] for row in res.data or [] if (row.get("raw_text") or "") == full_text), None)
 
 
 # ---------------------------------------------------------------------
@@ -234,7 +278,7 @@ async def sync_user(
         return SyncResult(linked=False)
     transcript = await sync_transcript(db, lms, user_id, student_id)
     materials = await lms.list_student_materials(student_id)
-    done = await imported_material_ids(db)
+    done = await imported_material_ids(db, user_id)
     imported: list[str] = []
     for material in [m for m in materials if m.id not in done][:max_imports]:
         try:

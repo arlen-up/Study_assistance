@@ -26,11 +26,14 @@ from backend.services.embedding_service import EmbeddingService
 logger = logging.getLogger(__name__)
 
 
-async def list_documents(db: AsyncClient, limit: int = 30) -> list[DocumentItem]:
+# 교안은 계정별로 나뉜다: 본인이 올리거나 가져온 교안(documents.created_by)만 보이고 쓸 수 있다.
+# db 는 secret 키 클라이언트(RLS 우회)라서 모든 조회에 소유자 조건을 직접 붙인다.
+async def list_documents(db: AsyncClient, user_id: UUID, limit: int = 30) -> list[DocumentItem]:
     try:
         res = (
             await db.table("documents")
             .select("id,title,course_name,week_no,keywords,created_at")
+            .eq("created_by", str(user_id))
             .order("created_at", desc=True)
             .limit(limit)
             .execute()
@@ -41,9 +44,17 @@ async def list_documents(db: AsyncClient, limit: int = 30) -> list[DocumentItem]
     return [DocumentItem.model_validate(row) for row in res.data]
 
 
-async def require_document(db: AsyncClient, document_id: UUID) -> None:
+async def require_document(db: AsyncClient, user_id: UUID, document_id: UUID) -> None:
+    """본인 교안이 아니면 '없음'으로 답한다 (남의 교안이 있는지도 알 수 없게)."""
     try:
-        res = await db.table("documents").select("id").eq("id", str(document_id)).limit(1).execute()
+        res = (
+            await db.table("documents")
+            .select("id")
+            .eq("id", str(document_id))
+            .eq("created_by", str(user_id))
+            .limit(1)
+            .execute()
+        )
     except Exception:
         logger.exception("documents 확인 실패")
         raise UpstreamError("교안 정보를 확인하지 못했습니다.") from None

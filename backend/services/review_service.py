@@ -49,7 +49,23 @@ async def _fetch(db: AsyncClient, user_id: UUID, document_id: UUID | None = None
     except Exception:
         logger.exception("review_schedule 조회 실패")
         raise UpstreamError("복습 일정을 불러오지 못했습니다.") from None
-    return [_to_item(row) for row in res.data or []]
+    return await _only_own_documents(db, user_id, [_to_item(row) for row in res.data or []])
+
+
+async def _only_own_documents(db: AsyncClient, user_id: UUID, items: list[ReviewItem]) -> list[ReviewItem]:
+    """교안은 계정별로 나뉜다: 예전에 남의 교안으로 공부한 기록은 복습 목록에 띄우지 않는다."""
+    ids = list({str(item.document_id) for item in items})
+    if not ids:
+        return items
+    try:
+        res = (
+            await db.table("documents").select("id").in_("id", ids).eq("created_by", str(user_id)).execute()
+        )
+    except Exception:
+        logger.exception("복습 교안 소유자 확인 실패")
+        raise UpstreamError("복습 일정을 불러오지 못했습니다.") from None
+    own = {row["id"] for row in res.data or []}
+    return [item for item in items if str(item.document_id) in own]
 
 
 def split_reviews(items: list[ReviewItem]) -> ReviewListResponse:

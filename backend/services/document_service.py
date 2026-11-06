@@ -270,6 +270,58 @@ async def ingest_document(
     )
 
 
+async def copy_document(db: AsyncClient, source_document_id: str, *, created_by: UUID) -> DocumentIngestResponse:
+    """이미 임베딩한 교안(같은 학교 LMS 자료)을 다른 계정의 교안으로 복사한다 — AI 임베딩을 다시 만들지 않는다.
+
+    교안은 계정별로 나뉘므로 같은 자료도 계정마다 따로 갖는다. 부르는 쪽에서 원본이 학교 자료이고
+    내용이 같은지 확인한 뒤에만 쓴다 (학생이 직접 올린 교안은 절대 복사하지 않는다).
+    """
+    try:
+        src = (
+            await db.table("documents")
+            .select("title,course_name,week_no,source_type,source_url,raw_text,keywords")
+            .eq("id", source_document_id)
+            .limit(1)
+            .execute()
+        )
+        chunks = (
+            await db.table("document_chunks")
+            .select("chunk_index,content,page_number,token_count,metadata,embedding")
+            .eq("document_id", source_document_id)
+            .order("chunk_index")
+            .execute()
+        )
+    except Exception:
+        logger.exception("교안 복사용 원본 조회 실패")
+        raise UpstreamError("교안을 가져오지 못했습니다.") from None
+    if not src.data or not chunks.data:
+        raise UpstreamError("교안을 가져오지 못했습니다.")
+    row = src.data[0]
+    try:
+        doc_res = await db.table("documents").insert({**row, "created_by": str(created_by)}).execute()
+    except Exception:
+        logger.exception("교안 복사 실패 (documents)")
+        raise UpstreamError("교안 저장에 실패했습니다.") from None
+    document_id: str = doc_res.data[0]["id"]
+    rows = [{**c, "document_id": document_id} for c in chunks.data]
+    try:
+        for start in range(0, len(rows), INSERT_BATCH):
+            await db.table("document_chunks").insert(rows[start : start + INSERT_BATCH]).execute()
+    except Exception:
+        logger.exception("교안 복사 실패 (chunks) → 롤백")
+        try:
+            await db.table("documents").delete().eq("id", document_id).execute()
+        except Exception:
+            logger.exception("롤백 삭제 실패: document_id=%s", document_id)
+        raise UpstreamError("교안 청크 저장에 실패했습니다.") from None
+    return DocumentIngestResponse(
+        document_id=UUID(document_id),
+        title=row["title"],
+        chunk_count=len(rows),
+        char_count=len(row.get("raw_text") or ""),
+    )
+
+
 def html_to_text(markup: str) -> str:
     """HTML(예: Moodle 페이지 본문)을 스크립트·스타일을 제외한 순수 텍스트로 바꾼다."""
     extractor = _TextExtractor()

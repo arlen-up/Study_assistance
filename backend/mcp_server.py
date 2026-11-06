@@ -129,6 +129,13 @@ def _deps() -> ToolDeps:
     return deps
 
 
+def _owner(deps: ToolDeps) -> str:
+    """교안은 계정별로 나뉜다. 로그인한 사용자 없이는 어떤 교안도 보여 주지 않는다."""
+    if deps.user_id is None:
+        raise ToolError("로그인한 사용자만 교안을 볼 수 있습니다.")
+    return str(deps.user_id)
+
+
 def _parse_uuid(value: str, name: str) -> str:
     try:
         return str(UUID(value.strip()))
@@ -231,7 +238,13 @@ async def _annotate_locations(deps: ToolDeps, chunks: list[SourceChunk]) -> None
     info: dict[str, dict[str, Any]] = {}
     if doc_ids:
         try:
-            res = await deps.db.table("documents").select("id,source_type,raw_text").in_("id", doc_ids).execute()
+            res = (
+                await deps.db.table("documents")
+                .select("id,source_type,raw_text")
+                .in_("id", doc_ids)
+                .eq("created_by", _owner(deps))
+                .execute()
+            )
             info = {row["id"]: row for row in res.data or []}
         except Exception:
             logger.warning("출처 위치 계산용 교안 조회 실패 — 기본 위치로 표시")
@@ -267,6 +280,7 @@ async def list_lms_documents(
     query = (
         deps.db.table("documents")
         .select("id,title,course_name,week_no,keywords,created_at")
+        .eq("created_by", _owner(deps))
         .order("created_at", desc=True)
         .limit(limit)
     )
@@ -360,6 +374,7 @@ async def fetch_lms_document(
             await deps.db.table("documents")
             .select("id,title,course_name,week_no,keywords,raw_text")
             .eq("id", doc_id)
+            .eq("created_by", _owner(deps))
             .limit(1)
             .execute()
         )
@@ -411,6 +426,7 @@ async def query_vector_db(
     min_similarity: Annotated[float, Field(ge=0.0, le=1.0, description="최소 코사인 유사도")] = 0.2,
 ) -> VectorSearchResult:
     deps = _deps()
+    owner = _owner(deps)
     filter_id = _parse_uuid(document_id, "document_id") if document_id else None
 
     embedding = deps.embedding_cache.get(query)
@@ -429,6 +445,7 @@ async def query_vector_db(
                 "match_count": top_k,
                 "match_threshold": min_similarity,
                 "filter_document_id": filter_id,
+                "filter_owner": owner,  # 본인 교안에서만 찾는다
             },
         ).execute()
     except Exception:
@@ -471,6 +488,7 @@ async def find_course_materials(
         res = (
             await deps.db.table("documents")
             .select("id,title,course_name,week_no,raw_text")
+            .eq("created_by", _owner(deps))
             .order("created_at", desc=True)
             .limit(200)
             .execute()

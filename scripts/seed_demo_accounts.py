@@ -20,7 +20,8 @@
      + 과목별 과제를 만들거나 마감일을 '지금' 기준으로 다시 맞추고, 계정마다 제출한 과제를 다르게 넣음
   3. 도우미 users 행에 학교 계정 연결·이수 학점·관심 직무·펫 이름·사용자 이름(학생 이름) 저장
      → 시연 계정은 '처음 이름 정하기' 창이 뜨지 않아요 (사용자 이름 마이그레이션 20261106030000 필요)
-  4. 학습 기록(잔디·복습 일정)을 계정마다 다른 모양으로 새로 채움 (오늘은 비워 둠)
+  4. 교안은 계정별로 나뉘므로, 듣는·들은 과목의 학교 LMS 자료 교안을 이 계정 교안으로 복사 (임베딩 그대로)
+  5. 학습 기록(잔디·복습 일정)을 이 계정 교안으로만, 계정마다 다른 모양으로 새로 채움 (오늘은 비워 둠)
 
 실행
   python scripts/seed_demo_accounts.py                 # 비밀번호 무작위 (5개 계정 공통)
@@ -326,27 +327,66 @@ def _norm(text: str | None) -> str:
     return re.sub(r"[^0-9A-Za-z가-힣]", "", text or "").lower()
 
 
-def document_pools(sb: httpx.Client, course_names: dict[str, str]) -> dict[str, list[str]]:
-    """과목 코드 → 그 과목 교안 id 목록 (제목이 사실상 같은 교안은 하나만)."""
-    docs = check(sb.get("/rest/v1/documents", params={"select": "id,title,course_name", "order": "created_at.asc"}),
-                 "교안 목록 조회").json()
-    by_name = {_norm(name): code for code, name in course_names.items()}
-    seen: set[str] = set()
-    pools: dict[str, list[str]] = {}
-    for d in docs:
-        name = _norm(d.get("course_name"))
-        if not name:
-            continue  # 과목이 없는 교안(개인 업로드 등)은 쓰지 않는다
-        title_key = _norm(d["title"])
-        if title_key in seen:
+LMS_PREFIX = "lms://materials/"
+
+
+def course_code_of(course_name: str | None, course_names: dict[str, str]) -> str | None:
+    """교안의 과목 이름 → 학교 과목 코드 (별칭·앞부분 일치 허용). 과목이 없으면 None."""
+    name = _norm(course_name)
+    if not name:
+        return None
+    by_name = {_norm(n): code for code, n in course_names.items()}
+    return by_name.get(name) or DOC_COURSE_ALIASES.get(name) or next(
+        (c for n, c in by_name.items() if n.startswith(name) or name.startswith(n)), None
+    )
+
+
+def copy_document(sb: httpx.Client, source_id: str, owner_id: str) -> None:
+    """학교 LMS 자료 교안을 이 계정 것으로 복사 (임베딩 그대로 → AI 비용 없음)."""
+    row = check(sb.get("/rest/v1/documents", params={
+        "id": f"eq.{source_id}", "select": "title,course_name,week_no,source_type,source_url,raw_text,keywords"}),
+        "복사할 교안 조회").json()[0]
+    chunks = check(sb.get("/rest/v1/document_chunks", params={
+        "document_id": f"eq.{source_id}", "order": "chunk_index.asc",
+        "select": "chunk_index,content,page_number,token_count,metadata,embedding"}), "복사할 교안 조각 조회").json()
+    new_id = check(sb.post("/rest/v1/documents", json={**row, "created_by": owner_id},
+                           headers={"Prefer": "return=representation"}), "교안 복사").json()[0]["id"]
+    check(sb.post("/rest/v1/document_chunks", json=[{**c, "document_id": new_id} for c in chunks],
+                  headers={"Prefer": "return=minimal"}), "교안 조각 복사")
+
+
+def own_document_pools(sb: httpx.Client, user_id: str, p: "Profile", course_names: dict[str, str]) -> tuple[dict[str, list[str]], int]:
+    """교안은 계정별로 나뉜다: 이 학생이 듣는·들은 과목의 학교 LMS 자료를 이 계정 교안으로 복사해 두고,
+    과목 코드 → 이 계정 교안 id 목록을 돌려준다. (학생이 직접 올린 교안은 다른 계정으로 복사하지 않는다)"""
+    wanted = {code for code, *_ in p.history}
+    own = check(sb.get("/rest/v1/documents", params={"created_by": f"eq.{user_id}", "select": "source_url"}),
+                "내 교안 조회").json()
+    have = {d["source_url"] for d in own if d.get("source_url")}
+    templates = check(sb.get("/rest/v1/documents", params={
+        "source_url": f"like.{LMS_PREFIX}*", "select": "id,title,course_name,source_url", "order": "created_at.asc"}),
+        "학교 자료 교안 조회").json()
+    copied, seen_titles = 0, set()
+    for t in templates:
+        title_key = _norm(t["title"])
+        if t["source_url"] in have or title_key in seen_titles:
             continue
-        seen.add(title_key)
-        code = by_name.get(name) or DOC_COURSE_ALIASES.get(name) or next(
-            (c for n, c in by_name.items() if n.startswith(name) or name.startswith(n)), None
-        )
-        if code:
+        if course_code_of(t.get("course_name"), course_names) in wanted:
+            copy_document(sb, t["id"], user_id)
+            have.add(t["source_url"])
+            seen_titles.add(title_key)
+            copied += 1
+
+    docs = check(sb.get("/rest/v1/documents", params={
+        "created_by": f"eq.{user_id}", "select": "id,title,course_name", "order": "created_at.asc"}), "내 교안 조회").json()
+    pools: dict[str, list[str]] = {}
+    seen: set[str] = set()
+    for d in docs:
+        code = course_code_of(d.get("course_name"), course_names)
+        title_key = _norm(d["title"])
+        if code and title_key not in seen:
+            seen.add(title_key)
             pools.setdefault(code, []).append(d["id"])
-    return pools
+    return pools, copied
 
 
 def seed_logs(sb: httpx.Client, user_id: str, p: Profile, pools: dict[str, list[str]], today: dt.date) -> int:
@@ -363,11 +403,11 @@ def seed_logs(sb: httpx.Client, user_id: str, p: Profile, pools: dict[str, list[
             out += [d for d in pools.get(code, []) if d not in out]
         return out
 
-    relevant = docs_of([*taking_codes, *done_codes])            # 내가 듣는·들었던 과목의 교안
+    relevant = docs_of([*taking_codes, *done_codes])            # 내가 듣는·들었던 과목의 교안 (모두 내 교안)
     others = [d for d in docs_of(list(pools)) if d not in relevant]
     ordered = relevant + others
     if len(ordered) < 4:
-        sys.exit(f"❌ 쓸 수 있는 교안이 {len(ordered)}개뿐이에요. 4개 이상 필요해요.")
+        sys.exit(f"❌ {p.email}: 쓸 수 있는 교안이 {len(ordered)}개뿐이에요. 4개 이상 필요해요.")
 
     # 복습 알림용 교안 3개는 이번 학기 과목 교안을 먼저 쓰고, 나머지로 잔디를 채운다
     due_1d, due_3d, upcoming = ordered[:3]
@@ -471,7 +511,6 @@ def main() -> None:
             bad = [key for key in p.submitted if key not in listed or key[0] not in taking_now]
             if bad:
                 sys.exit(f"❌ {p.email}: 목록에 없거나 듣지 않는 과목의 과제 {bad}")
-        pools = document_pools(sb, names)
         now = dt.datetime.now(dt.UTC).replace(minute=0, second=0, microsecond=0) + dt.timedelta(hours=1)
         assignment_ids = sync_assignments(sb, now)
         print(f"▶ 과제 {len(ASSIGNMENTS)}개 준비 (마감일은 지금 기준으로 다시 맞춤)")
@@ -495,6 +534,9 @@ def main() -> None:
                 "lms_student_id": student_id, "completed_credits": completed,
                 "lms_synced_at": dt.datetime.now(dt.UTC).isoformat(),
             }), "도우미 사용자 정보 저장")
+            pools, copied = own_document_pools(sb, user_id, p, names)
+            if copied:
+                print(f"  학교 자료 교안 {copied}개를 이 계정 교안으로 복사")
             count = seed_logs(sb, user_id, p, pools, today)
             streak, active_days = actual_streak(sb, user_id)
             if streak != p.pattern.expected_streak:
