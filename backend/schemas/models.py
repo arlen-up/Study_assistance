@@ -393,6 +393,7 @@ class LmsLinkStatus(BaseModel):
     completed_credits: int = 0
     in_progress_credits: int = 0
     synced_at: dt.datetime | None = None
+    reconnect: bool = False  # 예전에 연결했지만 토큰이 없거나 만료·폐기됨 → 학교 계정을 다시 연결해야 함
 
 
 # ---------------------------------------------------------------------

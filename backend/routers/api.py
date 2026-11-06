@@ -162,15 +162,17 @@ async def lms_status(user: CurrentUser, db: DbDep, lms: LmsDep) -> LmsLinkStatus
     return await lms_link_service.get_status(db, lms, user.id)
 
 
-@router.post("/lms/link-demo", response_model=LmsLinkStatus, tags=["lms"])
-async def lms_link_demo(user: CurrentUser, db: DbDep, lms: LmsDep) -> LmsLinkStatus:
-    """시연용 가상 LMS 학생을 만들어 현재 계정과 연결하고 성적을 동기화한다."""
-    return await lms_link_service.link_demo_account(db, lms, user)
+@router.post("/lms/unlink", response_model=LmsLinkStatus, tags=["lms"])
+async def lms_unlink(user: CurrentUser, db: DbDep, lms: LmsDep) -> LmsLinkStatus:
+    """학교 계정 연결 해제: 학교 쪽 토큰을 폐기하고 연결 정보를 지운다.
+    (연결은 학생이 학교 로그인·동의 화면을 거쳐야 하므로 웹 화면의 '학교 계정으로 연결'에서만 한다)"""
+    await lms_link_service.disconnect_school_account(db, lms, user.id)
+    return LmsLinkStatus(linked=False)
 
 
 @router.get("/lms/transcript", response_model=LmsTranscript, tags=["lms"])
 async def lms_transcript(user: CurrentUser, db: DbDep, lms: LmsDep) -> LmsTranscript:
-    student_id = await lms_link_service.require_student_id(db, user.id)
+    student_id = await lms_link_service.require_student_id(db, user.id, lms)
     return await lms_link_service.sync_transcript(db, lms, user.id, student_id)
 
 

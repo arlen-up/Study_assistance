@@ -52,6 +52,10 @@ class Settings(BaseSettings):
     lms_api_key: SecretStr | None = None
     lms_api_base_url: str | None = None  # 학사정보 API. 없으면 같은 앱 안의 가상 시스템을 직접 호출
     moodle_base_url: str | None = None   # 코스모스(Moodle) 주소. 없으면 가상 코스모스
+    # 학교 계정 연결 (OAuth 2.0). 실제 학교에서는 학교가 앱을 등록하고 client_id/secret 을 발급한다.
+    lms_oauth_client_id: str = "lssa-study-overflow"
+    lms_oauth_client_secret: SecretStr | None = None  # 없으면 가상 학교용 값을 LMS_API_KEY 에서 만든다
+    lms_token_key: SecretStr | None = None  # 학교가 발급한 학생 토큰을 DB에 암호화해 저장하는 서버 키 (32자 이상)
     lms_timeout_seconds: float = Field(default=10.0, gt=0, le=30)
 
     # --- Web Push 알림 ---
@@ -75,6 +79,7 @@ class Settings(BaseSettings):
 
     @field_validator(
         "lms_api_key", "lms_api_base_url", "moodle_base_url", "vapid_public_key", "vapid_private_key", "cron_secret",
+        "lms_oauth_client_secret", "lms_token_key",
         mode="before",
     )
     @classmethod

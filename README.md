@@ -1,4 +1,4 @@
-# Study Overflow — LMS 학습 도우미 & 커리어 나비게이터
+# LSSA (Study Overflow) — LMS 학습 도우미 & 커리어 나비게이터
 
 > 미루는 습관, 파편화된 학사 정보, 그리고 단기 기억에 머무는 학습 해결
 

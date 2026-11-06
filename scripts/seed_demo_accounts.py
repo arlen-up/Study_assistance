@@ -18,7 +18,9 @@
   1. Supabase 로그인 계정 만들기(이메일 인증 완료) — 이미 있으면 비밀번호만 새로 정함
   2. 가상 학교 시스템(lms_*)에 학생을 고정 학번(2026900001~5)으로 만들고, 수강 이력을 통째로 교체
      + 과목별 과제를 만들거나 마감일을 '지금' 기준으로 다시 맞추고, 계정마다 제출한 과제를 다르게 넣음
-  3. 도우미 users 행에 학교 계정 연결·이수 학점·관심 직무·펫 이름·사용자 이름(학생 이름) 저장
+  3. 학교 계정 연결: 가상 학교 로그인 비밀번호(= --password)를 정하고, 학생이 동의한 것처럼
+     학생 전용 토큰을 발급해 암호화 저장 (실제 앱에서는 학생이 '학교 계정으로 연결'에서 직접 로그인·동의)
+     + 도우미 users 행에 이수 학점·관심 직무·펫 이름·사용자 이름(학생 이름) 저장
      → 시연 계정은 '처음 이름 정하기' 창이 뜨지 않아요 (사용자 이름 마이그레이션 20261106030000 필요)
   4. 교안은 계정별로 나뉘므로, 듣는·들은 과목의 학교 LMS 자료 교안을 이 계정 교안으로 복사 (임베딩 그대로)
   5. 학습 기록(잔디·복습 일정)을 이 계정 교안으로만, 계정마다 다른 모양으로 새로 채움 (오늘은 비워 둠)
@@ -44,6 +46,17 @@ from pathlib import Path
 
 import httpx
 from dotenv import load_dotenv
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # 프로젝트 모듈 (가상 학교 보안 도구 · 암호화)
+from backend.core.crypto import fernet_from_key  # noqa: E402
+from lms_mock.security import (  # noqa: E402
+    CLIENT_ID,
+    DEFAULT_SCOPE,
+    TOKEN_TTL_DAYS,
+    hash_password,
+    new_access_token,
+    sha256_hex,
+)
 
 KST = dt.timezone(dt.timedelta(hours=9))
 DEPARTMENT = "소프트웨어융합과"
@@ -315,6 +328,25 @@ def open_assignments(sb: httpx.Client, student_id: str) -> list[dict]:
                                 "order": "due_at.asc"}), "미제출 과제 조회").json()
 
 
+def connect_school_account(sb: httpx.Client, student_id: str, password: str, token_key: str) -> str:
+    """학생이 학교(가상 코스모스)에 로그인해 동의한 것과 같은 상태를 만든다.
+    - 가상 학교 로그인 비밀번호를 정하고 (scrypt 해시만 저장)
+    - 이 학생의 예전 토큰은 폐기하고, 새 학생 전용 토큰을 발급해 (학교 DB에는 해시만)
+    - 도우미에 줄 토큰은 LMS_TOKEN_KEY 로 암호화해 돌려준다"""
+    check(sb.patch("/rest/v1/lms_students", params={"id": f"eq.{student_id}"},
+                   json={"password_hash": hash_password(password)}), "학교 비밀번호 저장")
+    now = dt.datetime.now(dt.UTC)
+    check(sb.patch("/rest/v1/lms_access_tokens",
+                   params={"student_id": f"eq.{student_id}", "client_id": f"eq.{CLIENT_ID}", "revoked_at": "is.null"},
+                   json={"revoked_at": now.isoformat()}), "예전 토큰 폐기")
+    token = new_access_token()
+    check(sb.post("/rest/v1/lms_access_tokens", json={
+        "token_hash": sha256_hex(token), "student_id": student_id, "client_id": CLIENT_ID, "scope": DEFAULT_SCOPE,
+        "expires_at": (now + dt.timedelta(days=TOKEN_TTL_DAYS)).isoformat(),
+    }, headers={"Prefer": "return=minimal"}), "학생 전용 토큰 발급")
+    return fernet_from_key(token_key).encrypt(token.encode()).decode()
+
+
 def credit_summary(sb: httpx.Client, student_id: str) -> dict[str, int]:
     res = check(sb.post("/rest/v1/rpc/lms_get_credit_summary", json={"p_student_id": student_id}), "학점 요약 조회")
     return {row["category"]: int(row["earned_credits"]) for row in res.json()}
@@ -481,13 +513,16 @@ def pet_stage(streak: int, active_days: int) -> str:
 # ---------------------------------------------------------------------
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--password", help="5개 계정 공통 비밀번호 (비우면 무작위)")
+    parser.add_argument("--password", help="5개 계정 공통 비밀번호 — LSSA 로그인과 가상 학교 로그인 모두 (비우면 무작위)")
     args = parser.parse_args()
     if args.password is not None and len(args.password) < 6:
         sys.exit("비밀번호는 6자 이상이어야 해요.")
 
     load_dotenv(Path(__file__).resolve().parent.parent / ".env.local")
     url, key = os.environ["SUPABASE_URL"], os.environ["SUPABASE_SECRET_KEY"]
+    token_key = os.environ.get("LMS_TOKEN_KEY")
+    if not token_key:
+        sys.exit("❌ .env.local 에 LMS_TOKEN_KEY 가 없어요 (학교 토큰 암호화 키).")
     password = args.password or "Demo-" + secrets.token_urlsafe(9)
     today = dt.datetime.now(KST).date()
 
@@ -529,9 +564,10 @@ def main() -> None:
             submit_assignments(sb, student_id, p, assignment_ids, now)
             earned = credit_summary(sb, student_id)
             completed = sum(earned.values())
+            token_enc = connect_school_account(sb, student_id, password, token_key)
             check(sb.patch("/rest/v1/users", params={"id": f"eq.{user_id}"}, json={
                 "display_name": p.name, "username": p.name, "target_job": p.target_job, "pet_name": p.pet_name,
-                "lms_student_id": student_id, "completed_credits": completed,
+                "lms_student_id": student_id, "lms_token_enc": token_enc, "completed_credits": completed,
                 "lms_synced_at": dt.datetime.now(dt.UTC).isoformat(),
             }), "도우미 사용자 정보 저장")
             pools, copied = own_document_pools(sb, user_id, p, names)
@@ -551,7 +587,8 @@ def main() -> None:
                   f" · 남은 과제 {len(todo)}개 · 학습 기록 {count}개")
 
     hint = "직접 정한 값" if args.password else "무작위 — 다시 실행하면 바뀌어요"
-    print(f"\n✅ 완료! 5개 계정 공통 비밀번호 ({hint}): {password}\n")
+    print(f"\n✅ 완료! 5개 계정 공통 비밀번호 ({hint}): {password}")
+    print("   (LSSA 로그인 = 이메일 + 비밀번호, 가상 학교 로그인 = 학번 2026900001~5 + 같은 비밀번호)\n")
     for p, completed, now_credits, codes, count, no_docs, todo, streak, stage in summary:
         print(f"- {p.email}  {p.name} · {p.grade_year}학년({p.admission_year} 입학) · 관심 직무 {p.target_job}")
         print(f"    이수 {completed}학점 / 졸업 {total_required}학점 (남은 {max(total_required - completed, 0)}학점)"

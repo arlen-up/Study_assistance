@@ -1,12 +1,17 @@
-{# 🎓 내 학점 알아보기 패널 (가상 LMS 연동): 연결 상태 · 이수 학점 · 미제출 과제 #}
+{# 🎓 내 학점 알아보기 패널: 학교 계정 연결(OAuth 2.0) 상태 · 이수 학점 · 미제출 과제 #}
 <section id="lms-panel" class="card">
   <h2 class="card-title">🎓 내 학점 알아보기</h2>
+  {% if lms_notice %}<div class="alert info small" role="status">{{ lms_notice }}</div>{% endif %}
 
   {% if lms_error %}
     <div class="alert danger small" role="alert">{{ lms_error }}</div>
 
   {% elif lms_status and lms_status.linked %}
-    <p class="muted small">{{ lms_status.department }} · {{ lms_status.student_no }} · {{ lms_status.name }}</p>
+    <div class="row lms-linked">
+      <p class="muted small">🔗 학교 계정 연결됨 · {{ lms_status.department }} · {{ lms_status.student_no }} · {{ lms_status.name }}</p>
+      <button type="button" class="btn outline sm" hx-post="/ui/lms/unlink" hx-target="#lms-panel" hx-swap="outerHTML"
+              hx-confirm="학교 계정 연결을 해제할까요? 학교 쪽 토큰도 함께 폐기돼요." hx-disabled-elt="this">연결 해제</button>
+    </div>
     <div class="lms-credits">
       <div><p class="muted xsmall">이수 학점</p><p class="stat-value">{{ lms_status.completed_credits }}<small>학점</small></p></div>
       <div><p class="muted xsmall">수강 중</p><p class="stat-value">{{ lms_status.in_progress_credits }}<small>학점</small></p></div>
@@ -42,10 +47,16 @@
     <p id="lms-sync-loading" class="htmx-indicator muted small"><span class="spinner"></span> 학교 시스템에서 새 자료와 과제를 확인하는 중…</p>
 
   {% else %}
+    {% if lms_status and lms_status.reconnect %}
+    <div class="alert warning small" role="status">학교 계정 연결이 만료됐거나 예전 방식으로 연결돼 있어요. 다시 연결해 주세요.</div>
+    {% endif %}
     <p class="muted small">학교 계정을 연결하면 이수 학점·과제·강의 자료를 한눈에 보고, AI가 함께 분석해요.</p>
-    <button type="button" class="btn primary block" hx-post="/ui/lms/link" hx-target="#lms-panel" hx-swap="outerHTML"
-            hx-disabled-elt="this" hx-indicator="#lms-loading">학교 계정 연결 (시연용)</button>
-    <p id="lms-loading" class="htmx-indicator muted small"><span class="spinner"></span> 학교 시스템에서 성적표를 가져오는 중…</p>
+    <a class="btn primary block" href="/ui/lms/connect" hx-boost="false">🏫 학교 계정으로 연결</a>
+    <ul class="muted xsmall oauth-points">
+      <li>학교(가상 코스모스) 화면에서 직접 로그인하고 허용해요. <strong>학교 비밀번호는 LSSA에 전달되지 않아요.</strong></li>
+      <li>LSSA는 <strong>내 정보만</strong>, 허용한 범위(과목·과제·자료·성적 읽기, 과제 제출 표시) 안에서 읽어요.</li>
+      <li>언제든 '연결 해제'를 누르면 학교 쪽 토큰도 바로 폐기돼요.</li>
+    </ul>
   {% endif %}
 </section>
 

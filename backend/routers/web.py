@@ -8,8 +8,12 @@
   · 교안 뷰어: /ui/viewer/<교안 ID> (출처 위치 표시), /ui/viewer/<교안 ID>/file (PDF 원본)
 """
 
+import base64
+import hashlib
+import hmac
 import json
 import logging
+import secrets
 import time
 from typing import Annotated, Any, get_args
 from uuid import UUID, uuid4
@@ -18,6 +22,7 @@ from fastapi import APIRouter, File, Form, Path, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from pydantic import TypeAdapter, ValidationError
 
+from backend.core import crypto
 from backend.core.errors import AppError, BadRequestError, NotFoundError
 from backend.core.supabase_client import DbDep, SettingsDep
 from backend.integrations.lms_client import LmsClient, LmsDep
@@ -38,6 +43,7 @@ from backend.web.session import (
     OptionalWebUser,
     WebUser,
     clear_session_cookies,
+    is_https,
     set_session_cookies,
     sign_in,
     sign_up,
@@ -57,6 +63,15 @@ ROUTES: tuple[str, ...] = get_args(RouteType)
 VIEW_OF_TAB = {
     "chat": "chat", "summary": "chat", "quiz": "chat", "flashcards": "chat", "mindmap": "chat",
     "dashboard": "dashboard", "grades": "grades", "career": "grades", "upload": "upload",
+}
+
+
+LMS_RESULT_MESSAGES = {
+    "connected": "학교 계정을 연결했어요. 이제 내 과목·과제·자료를 내 계정으로만 가져와요.",
+    "denied": "학교 화면에서 '거부'를 눌러 연결하지 않았어요.",
+    "taken": "이 학교 계정은 이미 다른 LSSA 계정에 연결돼 있어요.",
+    "invalid": "연결 요청이 만료됐거나 확인할 수 없어요. 처음부터 다시 시도해 주세요.",
+    "failed": "학교 계정 연결에 실패했어요. 처음부터 다시 시도해 주세요.",
 }
 
 
@@ -155,6 +170,7 @@ async def dashboard_page(
     settings: SettingsDep,
     tab: Annotated[str, Query()] = "chat",
     quiz_doc: Annotated[str | None, Query()] = None,
+    lms_result: Annotated[str | None, Query(alias="lms", max_length=20)] = None,
 ) -> HTMLResponse:
     error: str | None = None
     dashboard = None
@@ -181,6 +197,7 @@ async def dashboard_page(
             "quiz_doc_item": quiz_doc_item,
             **await _insights_context(db, user.id, dashboard),
             **await _lms_context(db, lms, user.id),
+            "lms_notice": LMS_RESULT_MESSAGES.get(lms_result or ""),
             **await _career_context(db, user.id),
             "vapid_public_key": settings.vapid_public_key if settings.push_enabled else None,
         },
@@ -619,10 +636,74 @@ async def ui_upload(
 # ---------------------------------------------------------------------
 # 가상 LMS 연동 조각
 # ---------------------------------------------------------------------
-@router.post("/ui/lms/link", response_class=HTMLResponse)
-async def ui_lms_link(request: Request, user: WebUser, db: DbDep, lms: LmsDep) -> HTMLResponse:
-    await lms_link_service.link_demo_account(db, lms, user)
-    return _render_lms_panel(request, {**await _lms_context(db, lms, user.id), **await _career_context(db, user.id)})
+# 🔑 학교 계정 연결 (OAuth 2.0 + PKCE)
+#   ① /ui/lms/connect : state·PKCE 값을 만들어 암호화 쿠키에 담고, 학생을 학교 로그인·동의 화면으로 보낸다
+#   ② 학교가 /ui/lms/oauth/callback?code=…&state=… 로 돌려보내면 쿠키와 비교해 확인한 뒤 토큰으로 바꾼다
+#   학교 비밀번호는 도우미가 받지 않는다. 학생 전용 토큰은 암호화해 저장한다.
+OAUTH_COOKIE = "lms_oauth"
+OAUTH_COOKIE_PATH = "/ui/lms/oauth"
+OAUTH_MAX_AGE = 600
+
+
+def _grades_redirect(result: str) -> RedirectResponse:
+    response = RedirectResponse(f"/?tab=grades&lms={result}", status_code=303)
+    response.delete_cookie(OAUTH_COOKIE, path=OAUTH_COOKIE_PATH)
+    return response
+
+
+@router.get("/ui/lms/connect")
+async def ui_lms_connect(request: Request, user: WebUser, lms: LmsDep) -> RedirectResponse:
+    state = secrets.token_urlsafe(24)
+    verifier = secrets.token_urlsafe(64)  # PKCE: 86자 (43~128자)
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+    redirect_uri = str(request.url_for("lms_oauth_callback"))
+    sealed = crypto.seal(lms.settings, {"uid": str(user.id), "state": state, "verifier": verifier, "redirect": redirect_uri})
+    url = lms.authorize_url(redirect_uri=redirect_uri, state=state, code_challenge=challenge,
+                            scope=lms_link_service.REQUESTED_SCOPE)
+    response = RedirectResponse(url, status_code=303)
+    response.set_cookie(OAUTH_COOKIE, sealed, max_age=OAUTH_MAX_AGE, httponly=True, secure=is_https(request),
+                        samesite="lax", path=OAUTH_COOKIE_PATH)
+    return response
+
+
+@router.get("/ui/lms/oauth/callback", name="lms_oauth_callback")
+async def ui_lms_oauth_callback(
+    request: Request,
+    user: WebUser,
+    db: DbDep,
+    lms: LmsDep,
+    code: Annotated[str | None, Query(max_length=200)] = None,
+    state: Annotated[str | None, Query(max_length=200)] = None,
+    error: Annotated[str | None, Query(max_length=60)] = None,
+) -> RedirectResponse:
+    saved = crypto.unseal(lms.settings, request.cookies.get(OAUTH_COOKIE), OAUTH_MAX_AGE)
+    # 이 브라우저·이 사용자가 시작한 연결 요청인지 확인 (다른 사람이 만든 코드를 끼워 넣는 공격 방지)
+    if (
+        saved is None
+        or saved.get("uid") != str(user.id)
+        or not state
+        or not hmac.compare_digest(str(saved.get("state", "")), state)
+    ):
+        return _grades_redirect("invalid")
+    if error:
+        return _grades_redirect("denied" if error == "access_denied" else "failed")
+    if not code:
+        return _grades_redirect("failed")
+    try:
+        await lms_link_service.connect_school_account(
+            db, lms, user.id, code=code, redirect_uri=str(saved["redirect"]), code_verifier=str(saved["verifier"])
+        )
+    except AppError as exc:
+        logger.info("학교 계정 연결 실패: %s", exc.code)
+        return _grades_redirect("taken" if exc.code == "lms_already_linked" else "failed")
+    return _grades_redirect("connected")
+
+
+@router.post("/ui/lms/unlink", response_class=HTMLResponse)
+async def ui_lms_unlink(request: Request, user: WebUser, db: DbDep, lms: LmsDep) -> HTMLResponse:
+    await lms_link_service.disconnect_school_account(db, lms, user.id)
+    context = {**await _lms_context(db, lms, user.id), **await _career_context(db, user.id)}
+    return _render_lms_panel(request, {**context, "lms_notice": "학교 계정 연결을 해제했어요. 학교 쪽 토큰도 폐기했어요."})
 
 
 @router.post("/ui/lms/assignments/{assignment_id}/submit", response_class=HTMLResponse)

@@ -148,8 +148,11 @@ class MoodleClient:
         if isinstance(body, dict) and "exception" in body:
             code = str(body.get("errorcode", ""))
             logger.info("코스모스 오류: %s → %s", function, code)
-            if code in ("invalidtoken", "accessexception"):
-                raise UpstreamError("코스모스 인증에 실패했습니다. 연동 토큰을 확인해 주세요.", code="lms_auth_failed")
+            if code == "invalidtoken":  # 토큰 만료·폐기 → 학생이 학교 계정을 다시 연결해야 한다
+                raise AppError("학교 계정 연결이 만료됐어요. 학교 계정을 다시 연결해 주세요.",
+                               code="lms_reconnect", status_code=400)
+            if code == "accessexception":  # 학생이 허용하지 않은 기능 (권한 범위 밖)
+                raise AppError("학교 계정 연결 때 허용하지 않은 기능이에요.", code="lms_forbidden", status_code=403)
             if code in ("invalidrecord", "requireloginerror"):
                 raise NotFoundError("코스모스에서 해당 항목을 찾을 수 없습니다.", code="lms_not_found")
             if code == "nopermissions":

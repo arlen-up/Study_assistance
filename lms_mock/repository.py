@@ -134,14 +134,86 @@ async def seed_demo_student(db: AsyncClient, student_no: str, name: str) -> UUID
 
 
 # ---------------------------------------------------------------------
-# Moodle(코스모스) 호환 계층용 조회
+# 학교 계정 로그인 · OAuth 2.0 (코드·토큰은 해시만 저장)
 # ---------------------------------------------------------------------
-async def list_student_ids(db: AsyncClient) -> list[UUID]:
+async def find_login(db: AsyncClient, student_no: str) -> dict[str, Any] | None:
     try:
-        res = await db.table("lms_students").select("id").execute()
+        res = (
+            await db.table("lms_students")
+            .select("id,student_no,name,password_hash")
+            .eq("student_no", student_no)
+            .limit(1)
+            .execute()
+        )
     except Exception:
-        raise _db_error("학생 목록 조회") from None
-    return [UUID(r["id"]) for r in res.data or []]
+        raise _db_error("학생 로그인 조회") from None
+    return res.data[0] if res.data else None
+
+
+async def student_no_exists(db: AsyncClient, student_no: str) -> bool:
+    return await find_login(db, student_no) is not None
+
+
+async def set_password(db: AsyncClient, student_id: UUID, password_hash: str) -> None:
+    try:
+        await db.table("lms_students").update({"password_hash": password_hash}).eq("id", str(student_id)).execute()
+    except Exception:
+        raise _db_error("학교 비밀번호 저장") from None
+
+
+async def save_code(db: AsyncClient, row: dict[str, Any]) -> None:
+    try:
+        await db.table("lms_oauth_codes").insert(row).execute()
+    except Exception:
+        raise _db_error("일회용 코드 저장") from None
+
+
+async def consume_code(db: AsyncClient, code_hash: str) -> dict[str, Any] | None:
+    """일회용 코드를 '사용됨'으로 바꾸면서 내용을 돌려준다. 이미 썼거나 만료됐으면 None."""
+    try:
+        res = await db.rpc("lms_consume_oauth_code", {"p_code_hash": code_hash}).execute()
+    except Exception:
+        raise _db_error("일회용 코드 확인") from None
+    rows = res.data or []
+    return rows[0] if rows else None
+
+
+async def save_token(db: AsyncClient, row: dict[str, Any]) -> None:
+    try:
+        await db.table("lms_access_tokens").insert(row).execute()
+    except Exception:
+        raise _db_error("토큰 저장") from None
+
+
+async def find_token(db: AsyncClient, token_hash: str) -> dict[str, Any] | None:
+    """사용할 수 있는 토큰 (폐기·만료되지 않은 것)만."""
+    try:
+        res = (
+            await db.table("lms_access_tokens")
+            .select("student_id,client_id,scope,expires_at")
+            .eq("token_hash", token_hash)
+            .is_("revoked_at", "null")
+            .gt("expires_at", dt.datetime.now(dt.UTC).isoformat())
+            .limit(1)
+            .execute()
+        )
+    except Exception:
+        raise _db_error("토큰 확인") from None
+    return res.data[0] if res.data else None
+
+
+async def revoke_token(db: AsyncClient, token_hash: str, client_id: str) -> None:
+    try:
+        await (
+            db.table("lms_access_tokens")
+            .update({"revoked_at": dt.datetime.now(dt.UTC).isoformat()})
+            .eq("token_hash", token_hash)
+            .eq("client_id", client_id)
+            .is_("revoked_at", "null")
+            .execute()
+        )
+    except Exception:
+        raise _db_error("토큰 폐기") from None
 
 
 async def list_assignments_for_courses(db: AsyncClient, course_codes: list[str]) -> list[dict[str, Any]]:

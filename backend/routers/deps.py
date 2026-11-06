@@ -20,7 +20,7 @@ from supabase import AsyncClient
 
 
 async def _build_agent(settings: Settings, db: AsyncClient, lms: LmsClient, user_id: UUID) -> AgentService:
-    student_id = await lms_link_service.get_student_id(db, user_id)
+    student_id = await lms_link_service.get_student_id(db, user_id, lms)  # 이 학생의 토큰만 등록
     return AgentService(settings, db, lms=lms, lms_student_id=student_id, user_id=user_id)
 
 
