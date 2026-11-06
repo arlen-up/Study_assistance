@@ -309,6 +309,7 @@ class ReviewItem(BaseModel):
     next_review_at: dt.datetime | None = None
     is_due: bool
     stage_label: str
+    course_name: str | None = None  # 과목명 (documents.course_name)
 
 
 class ReviewListResponse(BaseModel):
