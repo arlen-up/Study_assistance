@@ -2,6 +2,7 @@
 
 - 페이지: GET /, /login
 - 폼 처리: POST /login, /signup, /logout
+- 사용자 이름: 처음 들어오면 이름 설정 창 → POST /ui/username (입력 중 확인: GET /ui/username/check)
 - HTMX 조각(/ui/*): 화면 일부만 HTML로 돌려주어 교체한다. JS 프레임워크 없이 동적인 화면을 만든다.
   · 챗봇: /ui/chat (질문 분류 → 답변), /ui/chat/summary·quiz (답변 밑 '이어서 하기' 단추)
   · 교안 뷰어: /ui/viewer/<교안 ID> (출처 위치 표시), /ui/viewer/<교안 ID>/file (PDF 원본)
@@ -27,6 +28,7 @@ from backend.services import (
     file_store,
     insights_service,
     lms_link_service,
+    profile_service,
     study_service,
     viewer_service,
 )
@@ -155,6 +157,7 @@ async def dashboard_page(
     error: str | None = None
     dashboard = None
     documents: list[DocumentItem] = []
+    username_state = await profile_service.get_state(db, user.id)
     try:
         dashboard = await study_service.get_dashboard(db, user.id)
         documents = await study_service.list_documents(db)
@@ -168,6 +171,7 @@ async def dashboard_page(
         "dashboard.html",
         {
             "user": user,
+            "username_state": username_state,
             "dashboard": dashboard,
             "documents": documents,
             "error": error,
@@ -214,6 +218,45 @@ async def _lms_context(db: AsyncClient, lms: LmsClient, user_id: UUID) -> dict[s
 
 def _render_lms_panel(request: Request, context: dict[str, Any]) -> HTMLResponse:
     return _render(request, "partials/lms_panel.html", {**context, "oob_materials": True})
+
+
+# ---------------------------------------------------------------------
+# 사용자 이름 (처음 한 번)
+# ---------------------------------------------------------------------
+@router.post("/ui/username", response_class=HTMLResponse)
+async def ui_set_username(
+    request: Request,
+    user: WebUser,
+    db: DbDep,
+    username: Annotated[str, Form(max_length=64)] = "",
+) -> Response:
+    htmx = request.headers.get("HX-Request") == "true"
+    try:
+        await profile_service.set_username(db, user.id, username)
+    except AppError as exc:
+        if not htmx:
+            return RedirectResponse("/", status_code=303)
+        return _render(request, "partials/username_form.html", {"value": username, "error": exc.message})
+    if not htmx:
+        return RedirectResponse("/", status_code=303)
+    return Response(status_code=200, headers={"HX-Redirect": "/"})
+
+
+@router.get("/ui/username/check", response_class=HTMLResponse)
+async def ui_check_username(
+    request: Request,
+    user: WebUser,
+    db: DbDep,
+    username: Annotated[str, Query(max_length=64)] = "",
+) -> HTMLResponse:
+    """입력하는 동안 바로 알려 주기: 규칙에 맞는지 + 다른 사람이 쓰고 있는지."""
+    if not username.strip():
+        return HTMLResponse("")
+    try:
+        _, problem = await profile_service.check(db, user.id, username)
+    except AppError as exc:
+        problem = exc.message
+    return _render(request, "partials/username_hint.html", {"problem": problem})
 
 
 # ---------------------------------------------------------------------

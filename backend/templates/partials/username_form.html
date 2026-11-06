@@ -1,0 +1,15 @@
+<form id="username-form" class="stack" method="post" action="/ui/username"
+      hx-post="/ui/username" hx-target="this" hx-swap="outerHTML" hx-disabled-elt="find button">
+  <label class="field">
+    <span>사용자 이름</span>
+    <input class="input" type="text" name="username" value="{{ value or '' }}" required minlength="2" maxlength="16"
+           autocomplete="nickname" autocapitalize="off" spellcheck="false" autofocus
+           placeholder="예: 새봄_2026"
+           hx-get="/ui/username/check" hx-trigger="input changed delay:400ms" hx-target="#username-hint"
+           hx-swap="innerHTML" hx-sync="this:replace"
+           aria-describedby="username-rule username-hint"{% if error %} aria-invalid="true"{% endif %}>
+  </label>
+  <p id="username-rule" class="muted xsmall">2~16자 · 한글, 영어, 숫자, 밑줄(_)만 쓸 수 있어요</p>
+  <p id="username-hint" class="username-hint" aria-live="polite">{% if error %}{% with problem = error %}{% include "partials/username_hint.html" %}{% endwith %}{% endif %}</p>
+  <button type="submit" class="btn primary">이 이름으로 시작하기</button>
+</form>
